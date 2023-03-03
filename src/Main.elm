@@ -8,8 +8,6 @@ import Url
 import Url.Builder as Bld
 import Url.Parser as Parser exposing ((<?>))
 import Url.Parser.Query as Query
-import String exposing (toList)
-import List.Extra exposing (takeWhile)
 
 main = Browser.application
   {
@@ -34,22 +32,19 @@ baseUrl = "http://127.0.0.1:5500/index.html"
 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
-init _ _ _ = ({token = ""}, Cmd.none)
-
--- getToken : Url.Url -> String
--- getToken url = Maybe.withDefault "" (Parser.parse authResult url)
-
--- -- authResult : Parser.Parser (String -> String) (Maybe String)
--- -- authResult = (Parser.s baseUrl <?> Query.string "code")
-
--- authResult : Parser.Parser (String -> String) String
--- authResult = Parser.s baseUrl <?> Query.string "code"
+init _ url _ = ({token = getToken url}, Cmd.none)
 
 getToken : Url.Url -> String
-getToken url = extract (Url.toString url)
+getToken url = Maybe.withDefault "getToken" (Parser.parse authResult url)
 
-extract : String -> String
-extract x = String.reverse x |> String.toList |> takeWhile (\c -> c /= '?')
+authResult : Parser.Parser (String -> String) String
+authResult = Parser.map (Maybe.withDefault "auth") (Parser.s "index.html" <?> Query.string "code")
+
+-- foo : String -> String
+-- foo x = case Url.fromString x of
+--   Nothing -> "foo"
+--   Just url -> getToken url
+
 
 view : Model -> Browser.Document Msg
 view model = 
@@ -63,7 +58,7 @@ viewBody : Model -> List (Html Msg)
 viewBody model = [
   h1 [] [text "True Shuffle for Spotify"]
   , button [onClick RequestedAuth] [text "Authenticate TrueShuffle"]
-  , text model.token]
+  , text <| "token: " ++ model.token]
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -92,5 +87,3 @@ onUrlRequest _ = RequestedAuth
 
 onUrlChange : Url.Url -> Msg
 onUrlChange _ = RequestedAuth
-
-
