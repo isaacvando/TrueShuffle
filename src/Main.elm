@@ -1,11 +1,15 @@
 module Main exposing (..)
 
 import Browser
+import Browser.Navigation as Nav
 import Html exposing (..)
 import Html.Events exposing (onClick)
 import Url
-import Browser.Navigation as Nav
 import Url.Builder as Bld
+import Url.Parser as Parser exposing ((<?>))
+import Url.Parser.Query as Query
+import String exposing (toList)
+import List.Extra exposing (takeWhile)
 
 main = Browser.application
   {
@@ -18,14 +22,34 @@ main = Browser.application
   }
 
 
-type alias Model = {}
+type alias Model = 
+  {
+    token : String
+  }
 
 type Msg = RequestedAuth
 
+baseUrl : String
+baseUrl = "http://127.0.0.1:5500/index.html"
+
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
-init _ _ _ = ({}, Cmd.none)
+init _ _ _ = ({token = ""}, Cmd.none)
 
+-- getToken : Url.Url -> String
+-- getToken url = Maybe.withDefault "" (Parser.parse authResult url)
+
+-- -- authResult : Parser.Parser (String -> String) (Maybe String)
+-- -- authResult = (Parser.s baseUrl <?> Query.string "code")
+
+-- authResult : Parser.Parser (String -> String) String
+-- authResult = Parser.s baseUrl <?> Query.string "code"
+
+getToken : Url.Url -> String
+getToken url = extract (Url.toString url)
+
+extract : String -> String
+extract x = String.reverse x |> String.toList |> takeWhile (\c -> c /= '?')
 
 view : Model -> Browser.Document Msg
 view model = 
@@ -36,9 +60,10 @@ view model =
 
 
 viewBody : Model -> List (Html Msg)
-viewBody _ = [
+viewBody model = [
   h1 [] [text "True Shuffle for Spotify"]
-  , button [onClick RequestedAuth] [text "Authenticate TrueShuffle"]]
+  , button [onClick RequestedAuth] [text "Authenticate TrueShuffle"]
+  , text model.token]
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -50,7 +75,7 @@ authUrl : String
 authUrl = Bld.crossOrigin "https://accounts.spotify.com/authorize" [] 
   [
   Bld.string "client_id" "0cdc0205c0184f809fa13c8f71d7848c"
-  , Bld.string "redirect_uri" "http://127.0.0.1:5500/index.html"
+  , Bld.string "redirect_uri" baseUrl
   , Bld.string "response_type" "code"
   ]
 
