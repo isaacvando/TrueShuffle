@@ -1,6 +1,5 @@
 module Main exposing (..)
 
-import Base64
 import Browser
 import Browser.Navigation as Nav
 import Html exposing (..)
@@ -9,9 +8,7 @@ import Http
 import OAuth
 import OAuth.AuthorizationCode as OAuth
 import Url exposing (Protocol(..))
-import Url.Builder as Bld
-import Url.Parser as Parser exposing ((<?>))
-import Url.Parser.Query as Query
+import Url.Parser exposing ((<?>))
 
 
 main =
@@ -39,19 +36,9 @@ type Msg
 -- CONSTANTS
 
 
-baseUrl : String
-baseUrl =
-    "127.0.0.1:5500/index.html"
-
-
 homeUrl : Url.Url
 homeUrl =
-    { defaultHttpUrl | host = "127.0.0.1:5500/index.html" }
-
-
-basePath : String
-basePath =
-    "/index.html"
+    { defaultHttpsUrl | protocol = Http, host = "127.0.0.1:5500/index.html" }
 
 
 clientSecret : String
@@ -74,7 +61,7 @@ init _ url _ =
         OAuth.Empty ->
             ( { authToken = "" }, Cmd.none )
 
-        OAuth.Success { code, state } ->
+        OAuth.Success { code } ->
             ( { authToken = "" }, getAuthToken code )
 
         _ ->
@@ -96,31 +83,6 @@ getAuthToken code =
 
 
 
--- getAuthToken : String -> Cmd Msg
--- getAuthToken t =
---     Http.request
---         { method = "POST"
---         , headers = [ Http.header "Authorization" base64Code, Http.header "Content-Type" "application/x-www-form-urlencoded" ]
---         , url = "https://accounts.spotify.com/api/token"
---         , body =
---             Http.multipartBody
---                 [ Http.stringPart "code" t
---                 , Http.stringPart "grant_type" "client_credentials"
---                 -- , Http.stringPart "grant_type" "authorization_code"
---                 , Http.stringPart "redirect_uri" baseUrl
---                 ]
---         , expect = Http.expectString GotText
---         , timeout = Nothing
---         , tracker = Nothing
---         }
-
-
-base64Code : String
-base64Code =
-    "Basic " ++ Base64.encode (clientId ++ ":" ++ clientSecret)
-
-
-
 -- UPDATE
 
 
@@ -133,7 +95,7 @@ update msg model =
         GotAccessToken (Ok a) ->
             ( { model | authToken = OAuth.tokenToString a.token }, Cmd.none )
 
-        GotAccessToken (Err e) ->
+        GotAccessToken (Err _) ->
             ( { model | authToken = "error boi" }, Cmd.none )
 
 
@@ -141,24 +103,10 @@ auth : OAuth.Authorization
 auth =
     { clientId = clientId
     , url = { defaultHttpsUrl | host = "accounts.spotify.com", path = "/authorize" }
-    , redirectUri = { defaultHttpUrl | host = baseUrl }
+    , redirectUri = homeUrl
     , scope = [ "playlist-read-private", "user-modify-playback-state" ]
     , state = Nothing
     }
-
-
-
--- PARSING
-
-
-getAccessCode : Url.Url -> String
-getAccessCode url =
-    Maybe.withDefault "" (Parser.parse authResult url)
-
-
-authResult : Parser.Parser (String -> String) String
-authResult =
-    Parser.map (Maybe.withDefault "") (Parser.s "index.html" <?> Query.string "code")
 
 
 
@@ -204,20 +152,13 @@ onUrlChange _ =
     RequestedAuth
 
 
+
+-- HELPERS
+
+
 defaultHttpsUrl : Url.Url
 defaultHttpsUrl =
     { protocol = Https
-    , host = ""
-    , path = ""
-    , port_ = Nothing
-    , query = Nothing
-    , fragment = Nothing
-    }
-
-
-defaultHttpUrl : Url.Url
-defaultHttpUrl =
-    { protocol = Http
     , host = ""
     , path = ""
     , port_ = Nothing
