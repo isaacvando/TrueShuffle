@@ -24,12 +24,14 @@ main =
 
 type alias Model =
     { authToken : String
+    , key : Nav.Key
     }
 
 
 type Msg
     = RequestedAuth
     | GotAccessToken (Result Http.Error OAuth.AuthenticationSuccess)
+    | Noop
 
 
 
@@ -56,16 +58,17 @@ clientId =
 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
-init _ url _ =
+init _ url key =
+    let
+        model =
+            { authToken = "", key = key }
+    in
     case OAuth.parseCode url of
-        OAuth.Empty ->
-            ( { authToken = "" }, Cmd.none )
-
         OAuth.Success { code } ->
-            ( { authToken = "" }, getAuthToken code )
+            ( model, getAuthToken code )
 
         _ ->
-            ( { authToken = "" }, Cmd.none )
+            ( model, Cmd.none )
 
 
 getAuthToken : OAuth.AuthorizationCode -> Cmd Msg
@@ -90,23 +93,26 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         RequestedAuth ->
-            ( model, auth |> OAuth.makeAuthorizationUrl |> Url.toString |> Nav.load )
+            ( model, Nav.load (Url.toString authUrl) )
 
         GotAccessToken (Ok a) ->
-            ( { model | authToken = OAuth.tokenToString a.token }, Cmd.none )
+            ( { model | authToken = OAuth.tokenToString a.token }
+            , Nav.replaceUrl model.key (Url.toString homeUrl)
+            )
 
-        GotAccessToken (Err _) ->
-            ( { model | authToken = "error boi" }, Cmd.none )
+        _ ->
+            ( model, Cmd.none )
 
 
-auth : OAuth.Authorization
-auth =
-    { clientId = clientId
-    , url = { defaultHttpsUrl | host = "accounts.spotify.com", path = "/authorize" }
-    , redirectUri = homeUrl
-    , scope = [ "playlist-read-private", "user-modify-playback-state" ]
-    , state = Nothing
-    }
+authUrl : Url.Url
+authUrl =
+    OAuth.makeAuthorizationUrl
+        { clientId = clientId
+        , url = { defaultHttpsUrl | host = "accounts.spotify.com", path = "/authorize" }
+        , redirectUri = homeUrl
+        , scope = [ "playlist-read-private", "user-modify-playback-state" ]
+        , state = Nothing
+        }
 
 
 
@@ -116,7 +122,12 @@ auth =
 view : Model -> Browser.Document Msg
 view model =
     { title = "True Shuffle"
-    , body = viewLogin model
+    , body =
+        if model.authToken == "" then
+            viewLogin model
+
+        else
+            viewHome model
     }
 
 
@@ -126,6 +137,13 @@ viewLogin model =
     , button [ onClick RequestedAuth ] [ text "Authenticate TrueShuffle" ]
     , br [] []
     , text <| "authToken: " ++ model.authToken
+    ]
+
+
+viewHome : Model -> List (Html Msg)
+viewHome model =
+    [ h1 [] [ text "True Shuffle for Spotify" ]
+    , button [] [ text "fetch username" ]
     ]
 
 
@@ -144,12 +162,12 @@ subs _ =
 
 onUrlRequest : Browser.UrlRequest -> Msg
 onUrlRequest _ =
-    RequestedAuth
+    Noop
 
 
 onUrlChange : Url.Url -> Msg
 onUrlChange _ =
-    RequestedAuth
+    Noop
 
 
 
