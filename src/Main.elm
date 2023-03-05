@@ -6,7 +6,9 @@ import Browser.Navigation as Nav
 import Html exposing (..)
 import Html.Events exposing (onClick)
 import Http
-import Url
+import OAuth
+import OAuth.AuthorizationCode as OAuth
+import Url exposing (Protocol(..))
 import Url.Builder as Bld
 import Url.Parser as Parser exposing ((<?>))
 import Url.Parser.Query as Query
@@ -24,18 +26,13 @@ main =
 
 
 type alias Model =
-    { accessCode : String
-    , authToken : String
-    , authorized : Bool
+    { authToken : String
     }
 
 
 type Msg
     = RequestedAuth
-    | GetStuff
-    | GotStuff
-    | AuthToken String
-    | GotText (Result Http.Error String)
+    | GotAccessToken (Result Http.Error OAuth.AuthenticationSuccess)
 
 
 
@@ -44,7 +41,17 @@ type Msg
 
 baseUrl : String
 baseUrl =
-    "http://127.0.0.1:5500/index.html"
+    "127.0.0.1:5500/index.html"
+
+
+homeUrl : Url.Url
+homeUrl =
+    { defaultHttpUrl | host = "127.0.0.1:5500/index.html" }
+
+
+basePath : String
+basePath =
+    "/index.html"
 
 
 clientSecret : String
@@ -63,34 +70,54 @@ clientId =
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init _ url _ =
-    if getAccessCode url == "" then
-        ( { accessCode = "", authorized = False, authToken = "" }, Cmd.none )
+    case OAuth.parseCode url of
+        OAuth.Empty ->
+            ( { authToken = "" }, Cmd.none )
 
-    else
-        ( { accessCode = getAccessCode url, authorized = False, authToken = "" }, getAuthToken (getAccessCode url) )
+        OAuth.Success { code, state } ->
+            ( { authToken = "" }, getAuthToken code )
+
+        _ ->
+            ( { authToken = "" }, Cmd.none )
 
 
-getAuthToken : String -> Cmd Msg
-getAuthToken t =
-    Http.request
-        { method = "POST"
-        , headers = [ Http.header "Authorization" base64Code, Http.header "Content-Type" "application/x-www-form-urlencoded" ]
-        , url = "https://accounts.spotify.com/api/token"
-        , body =
-            Http.multipartBody
-                [ Http.stringPart "code" t
-                , Http.stringPart "grant_type" "authorization_code"
-                , Http.stringPart "redirect_uri" baseUrl
-                ]
-        , expect = Http.expectString GotText
-        , timeout = Nothing
-        , tracker = Nothing
-        }
+getAuthToken : OAuth.AuthorizationCode -> Cmd Msg
+getAuthToken code =
+    Http.request <|
+        OAuth.makeTokenRequest GotAccessToken
+            { credentials =
+                { clientId = clientId
+                , secret = Just clientSecret
+                }
+            , code = code
+            , url = { defaultHttpsUrl | host = "accounts.spotify.com", path = "/api/token" }
+            , redirectUri = homeUrl
+            }
+
+
+
+-- getAuthToken : String -> Cmd Msg
+-- getAuthToken t =
+--     Http.request
+--         { method = "POST"
+--         , headers = [ Http.header "Authorization" base64Code, Http.header "Content-Type" "application/x-www-form-urlencoded" ]
+--         , url = "https://accounts.spotify.com/api/token"
+--         , body =
+--             Http.multipartBody
+--                 [ Http.stringPart "code" t
+--                 , Http.stringPart "grant_type" "client_credentials"
+--                 -- , Http.stringPart "grant_type" "authorization_code"
+--                 , Http.stringPart "redirect_uri" baseUrl
+--                 ]
+--         , expect = Http.expectString GotText
+--         , timeout = Nothing
+--         , tracker = Nothing
+--         }
 
 
 base64Code : String
 base64Code =
-    clientId ++ ":" ++ clientSecret |> Base64.encode
+    "Basic " ++ Base64.encode (clientId ++ ":" ++ clientSecret)
 
 
 
@@ -101,45 +128,23 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         RequestedAuth ->
-            ( model, Nav.load authUrl )
+            ( model, auth |> OAuth.makeAuthorizationUrl |> Url.toString |> Nav.load )
 
-        GetStuff ->
-            ( model
-            , Http.request
-                { method = "GET"
-                , headers = [ Http.header "Authorization" model.accessCode, Http.header "Content-Type" "application/json" ]
-                , url = "https://api.spotify.com/v1/me"
-                , body = Http.emptyBody
-                , expect = Http.expectWhatever (\_ -> GotStuff)
-                , timeout = Nothing
-                , tracker = Nothing
-                }
-            )
+        GotAccessToken (Ok a) ->
+            ( { model | authToken = OAuth.tokenToString a.token }, Cmd.none )
 
-        GotStuff ->
-            ( model, Cmd.none )
-
-        AuthToken s ->
-            ( { model | authToken = s, authorized = True }, Cmd.none )
-
-        GotText r ->
-            case r of
-                Ok s ->
-                    ( { model | authToken = s }, Cmd.none )
-
-                _ ->
-                    ( { model | authToken = "bonk bonk error moment" }, Cmd.none )
+        GotAccessToken (Err e) ->
+            ( { model | authToken = "error boi" }, Cmd.none )
 
 
-authUrl : String
-authUrl =
-    Bld.crossOrigin "https://accounts.spotify.com/authorize"
-        []
-        [ Bld.string "client_id" clientId
-        , Bld.string "redirect_uri" baseUrl
-        , Bld.string "response_type" "code"
-        , Bld.string "scope" "playlist-read-private user-modify-playback-state"
-        ]
+auth : OAuth.Authorization
+auth =
+    { clientId = clientId
+    , url = { defaultHttpsUrl | host = "accounts.spotify.com", path = "/authorize" }
+    , redirectUri = { defaultHttpUrl | host = baseUrl }
+    , scope = [ "playlist-read-private", "user-modify-playback-state" ]
+    , state = Nothing
+    }
 
 
 
@@ -172,17 +177,7 @@ viewLogin model =
     [ h1 [] [ text "True Shuffle for Spotify" ]
     , button [ onClick RequestedAuth ] [ text "Authenticate TrueShuffle" ]
     , br [] []
-    , text <| "accessCode: " ++ model.accessCode
-    , br [] []
     , text <| "authToken: " ++ model.authToken
-    ]
-
-
-viewHome : Model -> List (Html Msg)
-viewHome model =
-    [ text <| "token: " ++ model.accessCode
-    , br [] []
-    , button [ onClick GetStuff ] [ text "retrieve something" ]
     ]
 
 
@@ -207,3 +202,25 @@ onUrlRequest _ =
 onUrlChange : Url.Url -> Msg
 onUrlChange _ =
     RequestedAuth
+
+
+defaultHttpsUrl : Url.Url
+defaultHttpsUrl =
+    { protocol = Https
+    , host = ""
+    , path = ""
+    , port_ = Nothing
+    , query = Nothing
+    , fragment = Nothing
+    }
+
+
+defaultHttpUrl : Url.Url
+defaultHttpUrl =
+    { protocol = Http
+    , host = ""
+    , path = ""
+    , port_ = Nothing
+    , query = Nothing
+    , fragment = Nothing
+    }
