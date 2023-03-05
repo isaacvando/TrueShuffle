@@ -25,6 +25,7 @@ main =
 type alias Model =
     { authToken : String
     , key : Nav.Key
+    , username : String
     }
 
 
@@ -32,6 +33,8 @@ type Msg
     = RequestedAuth
     | GotAccessToken (Result Http.Error OAuth.AuthenticationSuccess)
     | Noop
+    | Fetch (Cmd Msg)
+    | Username String
 
 
 
@@ -41,6 +44,11 @@ type Msg
 homeUrl : Url.Url
 homeUrl =
     { defaultHttpsUrl | protocol = Http, host = "127.0.0.1:5500/index.html" }
+
+
+apiUrl : Url.Url
+apiUrl =
+    { defaultHttpsUrl | host = "api.spotify.com/v1" }
 
 
 clientSecret : String
@@ -61,7 +69,7 @@ init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init _ url key =
     let
         model =
-            { authToken = "", key = key }
+            { authToken = "", key = key, username = "" }
     in
     case OAuth.parseCode url of
         OAuth.Success { code } ->
@@ -99,6 +107,12 @@ update msg model =
             ( { model | authToken = OAuth.tokenToString a.token }
             , Nav.replaceUrl model.key (Url.toString homeUrl)
             )
+
+        Fetch cmd ->
+            ( model, cmd )
+
+        Username name ->
+            ( { model | username = name }, Cmd.none )
 
         _ ->
             ( model, Cmd.none )
@@ -143,8 +157,32 @@ viewLogin model =
 viewHome : Model -> List (Html Msg)
 viewHome model =
     [ h1 [] [ text "True Shuffle for Spotify" ]
-    , button [] [ text "fetch username" ]
+    , button [ onClick (Fetch (getUsername model.authToken)) ] [ text "fetch username" ]
+    , br [] []
+    , text model.username
     ]
+
+
+getUsername : String -> Cmd Msg
+getUsername tok =
+    Http.request
+        { method = "GET"
+        , headers = [ Http.header "Authorization" tok ]
+        , url = Url.toString { apiUrl | path = "/me" }
+        , body = Http.emptyBody
+        , expect = Http.expectString foo
+        , timeout = Nothing
+        , tracker = Nothing
+        }
+
+
+foo r =
+    case r of
+        Ok s ->
+            Username s
+
+        Err _ ->
+            Username "there was an error"
 
 
 
