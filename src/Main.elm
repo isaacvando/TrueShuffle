@@ -5,6 +5,7 @@ import Browser.Navigation as Nav
 import Html exposing (..)
 import Html.Events exposing (onClick)
 import Http
+import Json.Decode as Json
 import OAuth
 import OAuth.AuthorizationCode as OAuth
 import Url exposing (Protocol(..))
@@ -34,7 +35,7 @@ type Msg
     | GotAccessToken (Result Http.Error OAuth.AuthenticationSuccess)
     | Noop
     | Fetch (Cmd Msg)
-    | Username String
+    | Username (Result Http.Error String)
 
 
 
@@ -76,7 +77,7 @@ init _ url key =
             ( model, getAuthToken code )
 
         _ ->
-            ( model, Cmd.none )
+            ( model, Nav.load (Url.toString authUrl) )
 
 
 getAuthToken : OAuth.AuthorizationCode -> Cmd Msg
@@ -104,14 +105,18 @@ update msg model =
             ( model, Nav.load (Url.toString authUrl) )
 
         GotAccessToken (Ok a) ->
-            ( { model | authToken = OAuth.tokenToString a.token }
-            , Nav.replaceUrl model.key (Url.toString homeUrl)
+            let
+                tok =
+                    OAuth.tokenToString a.token
+            in
+            ( { model | authToken = tok }
+            , Cmd.batch [ Nav.replaceUrl model.key (Url.toString homeUrl), getUsername tok ]
             )
 
         Fetch cmd ->
             ( model, cmd )
 
-        Username name ->
+        Username (Ok name) ->
             ( { model | username = name }, Cmd.none )
 
         _ ->
@@ -170,19 +175,10 @@ getUsername tok =
         , headers = [ Http.header "Authorization" tok ]
         , url = Url.toString { apiUrl | path = "/me" }
         , body = Http.emptyBody
-        , expect = Http.expectString foo
+        , expect = Http.expectJson Username (Json.field "id" Json.string)
         , timeout = Nothing
         , tracker = Nothing
         }
-
-
-foo r =
-    case r of
-        Ok s ->
-            Username s
-
-        Err _ ->
-            Username "there was an error"
 
 
 
