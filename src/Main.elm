@@ -37,6 +37,7 @@ type Msg
     | Noop
     | Username (Result Http.Error String)
     | Playlists (Result Http.Error (List Playlist))
+    | Shuffle Playlist
 
 
 type alias Playlist =
@@ -126,6 +127,9 @@ update msg model =
         Playlists (Ok playlists) ->
             ( { model | playlists = playlists }, Cmd.none )
 
+        Shuffle p ->
+            ( { model | playlists = p :: List.filter ((/=) p) model.playlists }, Cmd.none )
+
         _ ->
             ( model, Cmd.none )
 
@@ -150,11 +154,16 @@ view model =
     { title = "True Shuffle"
     , body =
         [ h1 [] [ text "True Shuffle for Spotify" ]
-        , text model.username
+        , text <| "Welcome, " ++ model.username ++ "!"
         , br [] []
-        , ul [] (List.map (\x -> li [] [ text x.name ]) model.playlists)
+        , ul [] (List.map viewPlaylist model.playlists)
         ]
     }
+
+
+viewPlaylist : Playlist -> Html Msg
+viewPlaylist p =
+    li [] [ button [ onClick (Shuffle p) ] [ text p.name ] ]
 
 
 getUsername : String -> Cmd Msg
@@ -169,12 +178,11 @@ getPlaylists =
 
 playlistsDecoder : Json.Decoder (List Playlist)
 playlistsDecoder =
-    Json.at [ "items" ] (Json.list playlistDecoder)
-
-
-playlistDecoder : Json.Decoder Playlist
-playlistDecoder =
-    Json.map Playlist (Json.field "name" Json.string)
+    let
+        single =
+            Json.map Playlist (Json.field "name" Json.string)
+    in
+    Json.at [ "items" ] (Json.list single)
 
 
 get : String -> Http.Expect Msg -> String -> Cmd Msg
