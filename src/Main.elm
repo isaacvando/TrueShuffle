@@ -12,6 +12,7 @@ import Url exposing (Protocol(..))
 import Url.Parser exposing ((<?>))
 
 
+main : Program () Model Msg
 main =
     Browser.application
         { init = init
@@ -31,10 +32,8 @@ type alias Model =
 
 
 type Msg
-    = RequestedAuth
-    | GotAccessToken (Result Http.Error OAuth.AuthenticationSuccess)
+    = GotAccessToken (Result Http.Error OAuth.AuthenticationSuccess)
     | Noop
-    | Fetch (Cmd Msg)
     | Username (Result Http.Error String)
 
 
@@ -101,9 +100,6 @@ getAuthToken code =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        RequestedAuth ->
-            ( model, Nav.load (Url.toString authUrl) )
-
         GotAccessToken (Ok a) ->
             let
                 tok =
@@ -112,9 +108,6 @@ update msg model =
             ( { model | authToken = tok }
             , Cmd.batch [ Nav.replaceUrl model.key (Url.toString homeUrl), getUsername tok ]
             )
-
-        Fetch cmd ->
-            ( model, cmd )
 
         Username (Ok name) ->
             ( { model | username = name }, Cmd.none )
@@ -142,30 +135,10 @@ view : Model -> Browser.Document Msg
 view model =
     { title = "True Shuffle"
     , body =
-        if model.authToken == "" then
-            viewLogin model
-
-        else
-            viewHome model
+        [ h1 [] [ text "True Shuffle for Spotify" ]
+        , text model.username
+        ]
     }
-
-
-viewLogin : Model -> List (Html Msg)
-viewLogin model =
-    [ h1 [] [ text "True Shuffle for Spotify" ]
-    , button [ onClick RequestedAuth ] [ text "Authenticate TrueShuffle" ]
-    , br [] []
-    , text <| "authToken: " ++ model.authToken
-    ]
-
-
-viewHome : Model -> List (Html Msg)
-viewHome model =
-    [ h1 [] [ text "True Shuffle for Spotify" ]
-    , button [ onClick (Fetch (getUsername model.authToken)) ] [ text "fetch username" ]
-    , br [] []
-    , text model.username
-    ]
 
 
 getUsername : String -> Cmd Msg

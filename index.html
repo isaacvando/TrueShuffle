@@ -7791,14 +7791,9 @@ var $truqu$elm_oauth2$OAuth$tokenToString = function (_v0) {
 };
 var $author$project$Main$update = F2(
 	function (msg, model) {
-		_v0$4:
+		_v0$2:
 		while (true) {
 			switch (msg.$) {
-				case 'RequestedAuth':
-					return _Utils_Tuple2(
-						model,
-						$elm$browser$Browser$Navigation$load(
-							$elm$url$Url$toString($author$project$Main$authUrl)));
 				case 'GotAccessToken':
 					if (msg.a.$ === 'Ok') {
 						var a = msg.a.a;
@@ -7817,11 +7812,8 @@ var $author$project$Main$update = F2(
 										$author$project$Main$getUsername(tok)
 									])));
 					} else {
-						break _v0$4;
+						break _v0$2;
 					}
-				case 'Fetch':
-					var cmd = msg.a;
-					return _Utils_Tuple2(model, cmd);
 				case 'Username':
 					if (msg.a.$ === 'Ok') {
 						var name = msg.a.a;
@@ -7831,93 +7823,30 @@ var $author$project$Main$update = F2(
 								{username: name}),
 							$elm$core$Platform$Cmd$none);
 					} else {
-						break _v0$4;
+						break _v0$2;
 					}
 				default:
-					break _v0$4;
+					break _v0$2;
 			}
 		}
 		return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 	});
-var $author$project$Main$Fetch = function (a) {
-	return {$: 'Fetch', a: a};
-};
-var $elm$html$Html$br = _VirtualDom_node('br');
-var $elm$html$Html$button = _VirtualDom_node('button');
 var $elm$html$Html$h1 = _VirtualDom_node('h1');
-var $elm$virtual_dom$VirtualDom$Normal = function (a) {
-	return {$: 'Normal', a: a};
-};
-var $elm$virtual_dom$VirtualDom$on = _VirtualDom_on;
-var $elm$html$Html$Events$on = F2(
-	function (event, decoder) {
-		return A2(
-			$elm$virtual_dom$VirtualDom$on,
-			event,
-			$elm$virtual_dom$VirtualDom$Normal(decoder));
-	});
-var $elm$html$Html$Events$onClick = function (msg) {
-	return A2(
-		$elm$html$Html$Events$on,
-		'click',
-		$elm$json$Json$Decode$succeed(msg));
-};
 var $elm$virtual_dom$VirtualDom$text = _VirtualDom_text;
 var $elm$html$Html$text = $elm$virtual_dom$VirtualDom$text;
-var $author$project$Main$viewHome = function (model) {
-	return _List_fromArray(
-		[
-			A2(
-			$elm$html$Html$h1,
-			_List_Nil,
-			_List_fromArray(
-				[
-					$elm$html$Html$text('True Shuffle for Spotify')
-				])),
-			A2(
-			$elm$html$Html$button,
-			_List_fromArray(
-				[
-					$elm$html$Html$Events$onClick(
-					$author$project$Main$Fetch(
-						$author$project$Main$getUsername(model.authToken)))
-				]),
-			_List_fromArray(
-				[
-					$elm$html$Html$text('fetch username')
-				])),
-			A2($elm$html$Html$br, _List_Nil, _List_Nil),
-			$elm$html$Html$text(model.username)
-		]);
-};
-var $author$project$Main$RequestedAuth = {$: 'RequestedAuth'};
-var $author$project$Main$viewLogin = function (model) {
-	return _List_fromArray(
-		[
-			A2(
-			$elm$html$Html$h1,
-			_List_Nil,
-			_List_fromArray(
-				[
-					$elm$html$Html$text('True Shuffle for Spotify')
-				])),
-			A2(
-			$elm$html$Html$button,
-			_List_fromArray(
-				[
-					$elm$html$Html$Events$onClick($author$project$Main$RequestedAuth)
-				]),
-			_List_fromArray(
-				[
-					$elm$html$Html$text('Authenticate TrueShuffle')
-				])),
-			A2($elm$html$Html$br, _List_Nil, _List_Nil),
-			$elm$html$Html$text('authToken: ' + model.authToken)
-		]);
-};
 var $author$project$Main$view = function (model) {
 	return {
-		body: (model.authToken === '') ? $author$project$Main$viewLogin(model) : $author$project$Main$viewHome(model),
+		body: _List_fromArray(
+			[
+				A2(
+				$elm$html$Html$h1,
+				_List_Nil,
+				_List_fromArray(
+					[
+						$elm$html$Html$text('True Shuffle for Spotify')
+					])),
+				$elm$html$Html$text(model.username)
+			]),
 		title: 'True Shuffle'
 	};
 };
