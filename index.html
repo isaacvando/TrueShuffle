@@ -7728,7 +7728,7 @@ var $truqu$elm_oauth2$OAuth$AuthorizationCode$parseCodeWith = F2(
 var $truqu$elm_oauth2$OAuth$AuthorizationCode$parseCode = $truqu$elm_oauth2$OAuth$AuthorizationCode$parseCodeWith($truqu$elm_oauth2$OAuth$AuthorizationCode$defaultParsers);
 var $author$project$Main$init = F3(
 	function (_v0, url, key) {
-		var model = {authToken: '', key: key, username: ''};
+		var model = {authToken: '', key: key, playlists: _List_Nil, username: ''};
 		var _v1 = $truqu$elm_oauth2$OAuth$AuthorizationCode$parseCode(url);
 		if (_v1.$ === 'Success') {
 			var code = _v1.a.code;
@@ -7755,34 +7755,62 @@ var $author$project$Main$subs = function (_v0) {
 	return $elm$core$Platform$Sub$none;
 };
 var $elm$core$Platform$Cmd$batch = _Platform_batch;
-var $author$project$Main$Username = function (a) {
-	return {$: 'Username', a: a};
+var $author$project$Main$Playlists = function (a) {
+	return {$: 'Playlists', a: a};
 };
 var $author$project$Main$apiUrl = _Utils_update(
 	$author$project$Main$defaultHttpsUrl,
 	{host: 'api.spotify.com/v1'});
 var $elm$http$Http$emptyBody = _Http_emptyBody;
-var $author$project$Main$getUsername = function (tok) {
-	return $elm$http$Http$request(
-		{
-			body: $elm$http$Http$emptyBody,
-			expect: A2(
-				$elm$http$Http$expectJson,
-				$author$project$Main$Username,
-				A2($elm$json$Json$Decode$field, 'id', $elm$json$Json$Decode$string)),
-			headers: _List_fromArray(
-				[
-					A2($elm$http$Http$header, 'Authorization', tok)
-				]),
-			method: 'GET',
-			timeout: $elm$core$Maybe$Nothing,
-			tracker: $elm$core$Maybe$Nothing,
-			url: $elm$url$Url$toString(
-				_Utils_update(
-					$author$project$Main$apiUrl,
-					{path: '/me'}))
-		});
+var $author$project$Main$get = F3(
+	function (path, expect, tok) {
+		return $elm$http$Http$request(
+			{
+				body: $elm$http$Http$emptyBody,
+				expect: expect,
+				headers: _List_fromArray(
+					[
+						A2($elm$http$Http$header, 'Authorization', tok)
+					]),
+				method: 'GET',
+				timeout: $elm$core$Maybe$Nothing,
+				tracker: $elm$core$Maybe$Nothing,
+				url: $elm$url$Url$toString(
+					_Utils_update(
+						$author$project$Main$apiUrl,
+						{path: path}))
+			});
+	});
+var $elm$json$Json$Decode$at = F2(
+	function (fields, decoder) {
+		return A3($elm$core$List$foldr, $elm$json$Json$Decode$field, decoder, fields);
+	});
+var $author$project$Main$Playlist = function (name) {
+	return {name: name};
 };
+var $author$project$Main$playlistDecoder = A2(
+	$elm$json$Json$Decode$map,
+	$author$project$Main$Playlist,
+	A2($elm$json$Json$Decode$field, 'name', $elm$json$Json$Decode$string));
+var $author$project$Main$playlistsDecoder = A2(
+	$elm$json$Json$Decode$at,
+	_List_fromArray(
+		['items']),
+	$elm$json$Json$Decode$list($author$project$Main$playlistDecoder));
+var $author$project$Main$getPlaylists = A2(
+	$author$project$Main$get,
+	'/me/playlists',
+	A2($elm$http$Http$expectJson, $author$project$Main$Playlists, $author$project$Main$playlistsDecoder));
+var $author$project$Main$Username = function (a) {
+	return {$: 'Username', a: a};
+};
+var $author$project$Main$getUsername = A2(
+	$author$project$Main$get,
+	'/me',
+	A2(
+		$elm$http$Http$expectJson,
+		$author$project$Main$Username,
+		A2($elm$json$Json$Decode$field, 'id', $elm$json$Json$Decode$string)));
 var $elm$core$Platform$Cmd$none = $elm$core$Platform$Cmd$batch(_List_Nil);
 var $elm$browser$Browser$Navigation$replaceUrl = _Browser_replaceUrl;
 var $truqu$elm_oauth2$OAuth$tokenToString = function (_v0) {
@@ -7791,7 +7819,7 @@ var $truqu$elm_oauth2$OAuth$tokenToString = function (_v0) {
 };
 var $author$project$Main$update = F2(
 	function (msg, model) {
-		_v0$2:
+		_v0$3:
 		while (true) {
 			switch (msg.$) {
 				case 'GotAccessToken':
@@ -7809,10 +7837,11 @@ var $author$project$Main$update = F2(
 										$elm$browser$Browser$Navigation$replaceUrl,
 										model.key,
 										$elm$url$Url$toString($author$project$Main$homeUrl)),
-										$author$project$Main$getUsername(tok)
+										$author$project$Main$getUsername(tok),
+										$author$project$Main$getPlaylists(tok)
 									])));
 					} else {
-						break _v0$2;
+						break _v0$3;
 					}
 				case 'Username':
 					if (msg.a.$ === 'Ok') {
@@ -7823,17 +7852,31 @@ var $author$project$Main$update = F2(
 								{username: name}),
 							$elm$core$Platform$Cmd$none);
 					} else {
-						break _v0$2;
+						break _v0$3;
+					}
+				case 'Playlists':
+					if (msg.a.$ === 'Ok') {
+						var playlists = msg.a.a;
+						return _Utils_Tuple2(
+							_Utils_update(
+								model,
+								{playlists: playlists}),
+							$elm$core$Platform$Cmd$none);
+					} else {
+						break _v0$3;
 					}
 				default:
-					break _v0$2;
+					break _v0$3;
 			}
 		}
 		return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 	});
+var $elm$html$Html$br = _VirtualDom_node('br');
 var $elm$html$Html$h1 = _VirtualDom_node('h1');
+var $elm$html$Html$li = _VirtualDom_node('li');
 var $elm$virtual_dom$VirtualDom$text = _VirtualDom_text;
 var $elm$html$Html$text = $elm$virtual_dom$VirtualDom$text;
+var $elm$html$Html$ul = _VirtualDom_node('ul');
 var $author$project$Main$view = function (model) {
 	return {
 		body: _List_fromArray(
@@ -7845,7 +7888,23 @@ var $author$project$Main$view = function (model) {
 					[
 						$elm$html$Html$text('True Shuffle for Spotify')
 					])),
-				$elm$html$Html$text(model.username)
+				$elm$html$Html$text(model.username),
+				A2($elm$html$Html$br, _List_Nil, _List_Nil),
+				A2(
+				$elm$html$Html$ul,
+				_List_Nil,
+				A2(
+					$elm$core$List$map,
+					function (x) {
+						return A2(
+							$elm$html$Html$li,
+							_List_Nil,
+							_List_fromArray(
+								[
+									$elm$html$Html$text(x.name)
+								]));
+					},
+					model.playlists))
 			]),
 		title: 'True Shuffle'
 	};

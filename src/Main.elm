@@ -28,6 +28,7 @@ type alias Model =
     { authToken : String
     , key : Nav.Key
     , username : String
+    , playlists : List Playlist
     }
 
 
@@ -35,6 +36,12 @@ type Msg
     = GotAccessToken (Result Http.Error OAuth.AuthenticationSuccess)
     | Noop
     | Username (Result Http.Error String)
+    | Playlists (Result Http.Error (List Playlist))
+
+
+type alias Playlist =
+    { name : String
+    }
 
 
 
@@ -69,7 +76,7 @@ init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init _ url key =
     let
         model =
-            { authToken = "", key = key, username = "" }
+            { authToken = "", key = key, username = "", playlists = [] }
     in
     case OAuth.parseCode url of
         OAuth.Success { code } ->
@@ -106,11 +113,18 @@ update msg model =
                     OAuth.tokenToString a.token
             in
             ( { model | authToken = tok }
-            , Cmd.batch [ Nav.replaceUrl model.key (Url.toString homeUrl), getUsername tok ]
+            , Cmd.batch
+                [ Nav.replaceUrl model.key (Url.toString homeUrl)
+                , getUsername tok
+                , getPlaylists tok
+                ]
             )
 
         Username (Ok name) ->
             ( { model | username = name }, Cmd.none )
+
+        Playlists (Ok playlists) ->
+            ( { model | playlists = playlists }, Cmd.none )
 
         _ ->
             ( model, Cmd.none )
@@ -137,18 +151,40 @@ view model =
     , body =
         [ h1 [] [ text "True Shuffle for Spotify" ]
         , text model.username
+        , br [] []
+        , ul [] (List.map (\x -> li [] [ text x.name ]) model.playlists)
         ]
     }
 
 
 getUsername : String -> Cmd Msg
-getUsername tok =
+getUsername =
+    get "/me" (Http.expectJson Username (Json.field "id" Json.string))
+
+
+getPlaylists : String -> Cmd Msg
+getPlaylists =
+    get "/me/playlists" (Http.expectJson Playlists playlistsDecoder)
+
+
+playlistsDecoder : Json.Decoder (List Playlist)
+playlistsDecoder =
+    Json.at [ "items" ] (Json.list playlistDecoder)
+
+
+playlistDecoder : Json.Decoder Playlist
+playlistDecoder =
+    Json.map Playlist (Json.field "name" Json.string)
+
+
+get : String -> Http.Expect Msg -> String -> Cmd Msg
+get path expect tok =
     Http.request
         { method = "GET"
         , headers = [ Http.header "Authorization" tok ]
-        , url = Url.toString { apiUrl | path = "/me" }
+        , url = Url.toString { apiUrl | path = path }
         , body = Http.emptyBody
-        , expect = Http.expectJson Username (Json.field "id" Json.string)
+        , expect = expect
         , timeout = Nothing
         , tracker = Nothing
         }
