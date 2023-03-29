@@ -7728,7 +7728,7 @@ var $truqu$elm_oauth2$OAuth$AuthorizationCode$parseCodeWith = F2(
 var $truqu$elm_oauth2$OAuth$AuthorizationCode$parseCode = $truqu$elm_oauth2$OAuth$AuthorizationCode$parseCodeWith($truqu$elm_oauth2$OAuth$AuthorizationCode$defaultParsers);
 var $author$project$Main$init = F3(
 	function (_v0, url, key) {
-		var model = {authToken: '', key: key, playlists: _List_Nil, username: ''};
+		var model = {authToken: '', key: key, playlists: _List_Nil, songs: _List_Nil, username: ''};
 		var _v1 = $truqu$elm_oauth2$OAuth$AuthorizationCode$parseCode(url);
 		if (_v1.$ === 'Success') {
 			var code = _v1.a.code;
@@ -7792,28 +7792,63 @@ var $author$project$Main$get = F3(
 						{path: path}))
 			});
 	});
-var $author$project$Main$Playlist = function (name) {
-	return {name: name};
-};
+var $author$project$Main$Playlist = F2(
+	function (name, id) {
+		return {id: id, name: name};
+	});
 var $elm$json$Json$Decode$at = F2(
 	function (fields, decoder) {
 		return A3($elm$core$List$foldr, $elm$json$Json$Decode$field, decoder, fields);
 	});
 var $author$project$Main$playlistsDecoder = function () {
-	var single = A2(
-		$elm$json$Json$Decode$map,
+	var fields = A3(
+		$elm$json$Json$Decode$map2,
 		$author$project$Main$Playlist,
-		A2($elm$json$Json$Decode$field, 'name', $elm$json$Json$Decode$string));
+		A2($elm$json$Json$Decode$field, 'name', $elm$json$Json$Decode$string),
+		A2($elm$json$Json$Decode$field, 'id', $elm$json$Json$Decode$string));
 	return A2(
 		$elm$json$Json$Decode$at,
 		_List_fromArray(
 			['items']),
-		$elm$json$Json$Decode$list(single));
+		$elm$json$Json$Decode$list(fields));
 }();
 var $author$project$Main$getPlaylists = A2(
 	$author$project$Main$get,
 	'/me/playlists',
 	A2($elm$http$Http$expectJson, $author$project$Main$Playlists, $author$project$Main$playlistsDecoder));
+var $author$project$Main$Songs = function (a) {
+	return {$: 'Songs', a: a};
+};
+var $author$project$Main$Song = F2(
+	function (name, id) {
+		return {id: id, name: name};
+	});
+var $author$project$Main$songsDecoder = function () {
+	var fields = A3(
+		$elm$json$Json$Decode$map2,
+		$author$project$Main$Song,
+		A2($elm$json$Json$Decode$field, 'name', $elm$json$Json$Decode$string),
+		A2($elm$json$Json$Decode$field, 'id', $elm$json$Json$Decode$string));
+	return A2(
+		$elm$json$Json$Decode$at,
+		_List_fromArray(
+			['items']),
+		$elm$json$Json$Decode$list(
+			A2(
+				$elm$json$Json$Decode$at,
+				_List_fromArray(
+					['track']),
+				fields)));
+}();
+var $author$project$Main$getSongs = F2(
+	function (_v0, tok) {
+		var id = _v0.id;
+		return A3(
+			$author$project$Main$get,
+			'/playlists/' + (id + '/tracks'),
+			A2($elm$http$Http$expectJson, $author$project$Main$Songs, $author$project$Main$songsDecoder),
+			tok);
+	});
 var $author$project$Main$Username = function (a) {
 	return {$: 'Username', a: a};
 };
@@ -7833,7 +7868,7 @@ var $truqu$elm_oauth2$OAuth$tokenToString = function (_v0) {
 };
 var $author$project$Main$update = F2(
 	function (msg, model) {
-		_v0$4:
+		_v0$5:
 		while (true) {
 			switch (msg.$) {
 				case 'GotAccessToken':
@@ -7855,7 +7890,7 @@ var $author$project$Main$update = F2(
 										$author$project$Main$getPlaylists(tok)
 									])));
 					} else {
-						break _v0$4;
+						break _v0$5;
 					}
 				case 'Username':
 					if (msg.a.$ === 'Ok') {
@@ -7866,7 +7901,7 @@ var $author$project$Main$update = F2(
 								{username: name}),
 							$elm$core$Platform$Cmd$none);
 					} else {
-						break _v0$4;
+						break _v0$5;
 					}
 				case 'Playlists':
 					if (msg.a.$ === 'Ok') {
@@ -7877,7 +7912,7 @@ var $author$project$Main$update = F2(
 								{playlists: playlists}),
 							$elm$core$Platform$Cmd$none);
 					} else {
-						break _v0$4;
+						break _v0$5;
 					}
 				case 'Shuffle':
 					var p = msg.a;
@@ -7893,15 +7928,27 @@ var $author$project$Main$update = F2(
 										$elm$core$Basics$neq(p),
 										model.playlists))
 							}),
-						$elm$core$Platform$Cmd$none);
+						A2($author$project$Main$getSongs, p, model.authToken));
+				case 'Songs':
+					if (msg.a.$ === 'Ok') {
+						var songs = msg.a.a;
+						return _Utils_Tuple2(
+							_Utils_update(
+								model,
+								{songs: songs}),
+							$elm$core$Platform$Cmd$none);
+					} else {
+						break _v0$5;
+					}
 				default:
-					break _v0$4;
+					break _v0$5;
 			}
 		}
 		return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 	});
 var $elm$html$Html$br = _VirtualDom_node('br');
 var $elm$html$Html$h1 = _VirtualDom_node('h1');
+var $elm$html$Html$li = _VirtualDom_node('li');
 var $elm$virtual_dom$VirtualDom$text = _VirtualDom_text;
 var $elm$html$Html$text = $elm$virtual_dom$VirtualDom$text;
 var $elm$html$Html$ul = _VirtualDom_node('ul');
@@ -7909,7 +7956,6 @@ var $author$project$Main$Shuffle = function (a) {
 	return {$: 'Shuffle', a: a};
 };
 var $elm$html$Html$button = _VirtualDom_node('button');
-var $elm$html$Html$li = _VirtualDom_node('li');
 var $elm$virtual_dom$VirtualDom$Normal = function (a) {
 	return {$: 'Normal', a: a};
 };
@@ -7962,7 +8008,25 @@ var $author$project$Main$view = function (model) {
 				A2(
 				$elm$html$Html$ul,
 				_List_Nil,
-				A2($elm$core$List$map, $author$project$Main$viewPlaylist, model.playlists))
+				A2($elm$core$List$map, $author$project$Main$viewPlaylist, model.playlists)),
+				A2(
+				$elm$html$Html$ul,
+				_List_Nil,
+				A2(
+					$elm$core$List$map,
+					function (s) {
+						return A2(
+							$elm$html$Html$li,
+							_List_Nil,
+							_List_fromArray(
+								[
+									$elm$html$Html$text(s.name)
+								]));
+					},
+					model.songs)),
+				$elm$html$Html$text(
+				$elm$core$String$fromInt(
+					$elm$core$List$length(model.songs)))
 			]),
 		title: 'True Shuffle'
 	};

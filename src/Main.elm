@@ -29,6 +29,7 @@ type alias Model =
     , key : Nav.Key
     , username : String
     , playlists : List Playlist
+    , songs : List Song
     }
 
 
@@ -38,10 +39,18 @@ type Msg
     | Username (Result Http.Error String)
     | Playlists (Result Http.Error (List Playlist))
     | Shuffle Playlist
+    | Songs (Result Http.Error (List Song))
 
 
 type alias Playlist =
     { name : String
+    , id : String
+    }
+
+
+type alias Song =
+    { name : String
+    , id : String
     }
 
 
@@ -77,7 +86,7 @@ init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init _ url key =
     let
         model =
-            { authToken = "", key = key, username = "", playlists = [] }
+            { authToken = "", key = key, username = "", playlists = [], songs = [] }
     in
     case OAuth.parseCode url of
         OAuth.Success { code } ->
@@ -128,10 +137,27 @@ update msg model =
             ( { model | playlists = playlists }, Cmd.none )
 
         Shuffle p ->
-            ( { model | playlists = p :: List.filter ((/=) p) model.playlists }, Cmd.none )
+            ( { model | playlists = p :: List.filter ((/=) p) model.playlists }, getSongs p model.authToken )
+
+        Songs (Ok songs) ->
+            ( { model | songs = songs }, Cmd.none )
 
         _ ->
             ( model, Cmd.none )
+
+
+getSongs : Playlist -> String -> Cmd Msg
+getSongs { id } tok =
+    get ("/playlists/" ++ id ++ "/tracks") (Http.expectJson Songs songsDecoder) tok
+
+
+songsDecoder : Json.Decoder (List Song)
+songsDecoder =
+    let
+        fields =
+            Json.map2 Song (Json.field "name" Json.string) (Json.field "id" Json.string)
+    in
+    Json.at [ "items" ] (Json.list (Json.at [ "track" ] fields))
 
 
 authUrl : Url.Url
@@ -143,27 +169,6 @@ authUrl =
         , scope = [ "playlist-read-private", "user-modify-playback-state" ]
         , state = Nothing
         }
-
-
-
--- VIEW
-
-
-view : Model -> Browser.Document Msg
-view model =
-    { title = "True Shuffle"
-    , body =
-        [ h1 [] [ text "True Shuffle for Spotify" ]
-        , text <| "Welcome, " ++ model.username ++ "!"
-        , br [] []
-        , ul [] (List.map viewPlaylist model.playlists)
-        ]
-    }
-
-
-viewPlaylist : Playlist -> Html Msg
-viewPlaylist p =
-    li [] [ button [ onClick (Shuffle p) ] [ text p.name ] ]
 
 
 getUsername : String -> Cmd Msg
@@ -179,10 +184,10 @@ getPlaylists =
 playlistsDecoder : Json.Decoder (List Playlist)
 playlistsDecoder =
     let
-        single =
-            Json.map Playlist (Json.field "name" Json.string)
+        fields =
+            Json.map2 Playlist (Json.field "name" Json.string) (Json.field "id" Json.string)
     in
-    Json.at [ "items" ] (Json.list single)
+    Json.at [ "items" ] (Json.list fields)
 
 
 get : String -> Http.Expect Msg -> String -> Cmd Msg
@@ -196,6 +201,29 @@ get path expect tok =
         , timeout = Nothing
         , tracker = Nothing
         }
+
+
+
+-- VIEW
+
+
+view : Model -> Browser.Document Msg
+view model =
+    { title = "True Shuffle"
+    , body =
+        [ h1 [] [ text "True Shuffle for Spotify" ]
+        , text <| "Welcome, " ++ model.username ++ "!"
+        , br [] []
+        , ul [] (List.map viewPlaylist model.playlists)
+        , ul [] (List.map (\s -> li [] [ text s.name ]) model.songs)
+        , text (String.fromInt (List.length model.songs))
+        ]
+    }
+
+
+viewPlaylist : Playlist -> Html Msg
+viewPlaylist p =
+    li [] [ button [ onClick (Shuffle p) ] [ text p.name ] ]
 
 
 
