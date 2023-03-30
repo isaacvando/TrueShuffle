@@ -167,11 +167,9 @@ update msg model =
             )
 
         ShuffledState songs ->
-            let
-                body =
-                    Http.jsonBody (Encode.object [ ( "uri", Encode.string "spotify:album:3BJUcKkbFSPXOPRz8NSRKQ" ) ])
-            in
-            ( { model | songs = songs }, post "/me/player/queue" body model.authToken )
+            ( { model | songs = songs }
+            , Cmd.batch (List.map (\s -> post ("/me/player/queue?uri=" ++ s.uri) model.authToken) (List.take 100 songs))
+            )
 
         fail ->
             let
@@ -256,14 +254,27 @@ get path expect tok =
         }
 
 
-post : String -> Http.Body -> String -> Cmd Msg
-post path body tok =
+post : String -> String -> Cmd Msg
+post path tok =
     Http.request
-        { method = "GET"
-        , headers = [ Http.header "Authorization" tok, Http.header "Content-Type" "application/json" ]
+        { method = "POST"
+        , headers = [ Http.header "Authorization" tok ]
         , url = Url.toString { apiUrl | path = path }
-        , body = body
+        , body = Http.emptyBody
         , expect = Http.expectWhatever (\_ -> AddedToQueue)
+        , timeout = Nothing
+        , tracker = Nothing
+        }
+
+
+req : { path : String, token : String, method : String, expect : Http.Expect Msg } -> Cmd Msg
+req args =
+    Http.request
+        { method = args.method
+        , headers = [ Http.header "Authorization" args.token ]
+        , url = Url.toString { apiUrl | path = args.path }
+        , body = Http.emptyBody
+        , expect = args.expect
         , timeout = Nothing
         , tracker = Nothing
         }
@@ -281,7 +292,7 @@ view model =
         , text <| "Welcome, " ++ model.username ++ "!"
         , br [] []
         , ul [] (List.map viewPlaylist model.playlists)
-        , ul [] (List.map (\s -> li [] [ text s.name ]) model.songs)
+        , ul [] (List.map (\s -> li [] [ text s.name, text " ", text s.uri ]) model.songs)
         , text (String.fromInt (List.length model.songs))
         ]
     }
