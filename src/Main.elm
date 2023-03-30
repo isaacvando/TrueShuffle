@@ -8,6 +8,8 @@ import Http
 import Json.Decode as Json
 import OAuth
 import OAuth.AuthorizationCode as OAuth
+import Random
+import Random.List
 import Url exposing (Protocol(..))
 import Url.Parser exposing ((<?>))
 
@@ -40,6 +42,7 @@ type Msg
     | Playlists (Result Http.Error (List Playlist))
     | Shuffle Playlist
     | Songs (Result Http.Error ( List Song, Maybe String ))
+    | ShuffledState (List Song)
 
 
 type alias Playlist =
@@ -143,10 +146,14 @@ update msg model =
             )
 
         Songs (Ok ( songs, nextQuery )) ->
-            ( { model | songs = model.songs ++ songs }
+            let
+                m =
+                    { model | songs = model.songs ++ songs }
+            in
+            ( m
             , case nextQuery of
                 Nothing ->
-                    Cmd.none
+                    Random.generate ShuffledState (Random.List.shuffle m.songs)
 
                 Just fullUrl ->
                     let
@@ -156,12 +163,19 @@ update msg model =
                     get path (Http.expectJson Songs songsDecoder) model.authToken
             )
 
+        ShuffledState songs ->
+            ( { model | songs = songs }, Cmd.none )
+
         fail ->
             let
                 _ =
                     Debug.log "fail msg" msg
             in
             ( model, Cmd.none )
+
+
+
+-- queue : Model -> Cmd Msg
 
 
 getSongs : Playlist -> String -> Cmd Msg
