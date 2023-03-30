@@ -39,12 +39,13 @@ type Msg
     | Username (Result Http.Error String)
     | Playlists (Result Http.Error (List Playlist))
     | Shuffle Playlist
-    | Songs (Result Http.Error (List Song))
+    | Songs (Result Http.Error ( List Song, Maybe String ))
 
 
 type alias Playlist =
     { name : String
     , id : String
+    , length : Int
     }
 
 
@@ -137,12 +138,29 @@ update msg model =
             ( { model | playlists = playlists }, Cmd.none )
 
         Shuffle p ->
-            ( { model | playlists = p :: List.filter ((/=) p) model.playlists }, getSongs p model.authToken )
+            ( { model | playlists = p :: List.filter ((/=) p) model.playlists, songs = [] }
+            , get ("/playlists/" ++ p.id ++ "/tracks") (Http.expectJson Songs songsDecoder) model.authToken
+            )
 
-        Songs (Ok songs) ->
-            ( { model | songs = songs }, Cmd.none )
+        Songs (Ok ( songs, nextQuery )) ->
+            ( { model | songs = model.songs ++ songs }
+            , case nextQuery of
+                Nothing ->
+                    Cmd.none
 
-        _ ->
+                Just fullUrl ->
+                    let
+                        path =
+                            String.dropLeft (String.length (Url.toString apiUrl)) fullUrl
+                    in
+                    get path (Http.expectJson Songs songsDecoder) model.authToken
+            )
+
+        fail ->
+            let
+                _ =
+                    Debug.log "fail msg" msg
+            in
             ( model, Cmd.none )
 
 
@@ -151,13 +169,23 @@ getSongs { id } tok =
     get ("/playlists/" ++ id ++ "/tracks") (Http.expectJson Songs songsDecoder) tok
 
 
-songsDecoder : Json.Decoder (List Song)
+
+-- TODO: Handle playlists with songs whose id is null
+
+
+songsDecoder : Json.Decoder ( List Song, Maybe String )
 songsDecoder =
     let
         fields =
             Json.map2 Song (Json.field "name" Json.string) (Json.field "id" Json.string)
+
+        songs =
+            Json.at [ "items" ] (Json.list (Json.at [ "track" ] fields))
+
+        nextUrl =
+            Json.field "next" (Json.nullable Json.string)
     in
-    Json.at [ "items" ] (Json.list (Json.at [ "track" ] fields))
+    Json.map2 (\x y -> ( x, y )) songs nextUrl
 
 
 authUrl : Url.Url
@@ -185,7 +213,11 @@ playlistsDecoder : Json.Decoder (List Playlist)
 playlistsDecoder =
     let
         fields =
-            Json.map2 Playlist (Json.field "name" Json.string) (Json.field "id" Json.string)
+            Json.map3
+                Playlist
+                (Json.field "name" Json.string)
+                (Json.field "id" Json.string)
+                (Json.at [ "tracks" ] (Json.field "total" Json.int))
     in
     Json.at [ "items" ] (Json.list fields)
 
@@ -223,7 +255,7 @@ view model =
 
 viewPlaylist : Playlist -> Html Msg
 viewPlaylist p =
-    li [] [ button [ onClick (Shuffle p) ] [ text p.name ] ]
+    li [] [ button [ onClick (Shuffle p) ] [ text p.name, text (String.fromInt p.length) ] ]
 
 
 
