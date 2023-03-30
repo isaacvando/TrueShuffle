@@ -7990,9 +7990,69 @@ var $author$project$Main$getUsername = A2(
 		$elm$http$Http$expectJson,
 		$author$project$Main$Username,
 		A2($elm$json$Json$Decode$field, 'id', $elm$json$Json$Decode$string)));
+var $elm$http$Http$jsonBody = function (value) {
+	return A2(
+		_Http_pair,
+		'application/json',
+		A2($elm$json$Json$Encode$encode, 0, value));
+};
 var $elm$core$Debug$log = _Debug_log;
 var $elm$core$Basics$neq = _Utils_notEqual;
 var $elm$core$Platform$Cmd$none = $elm$core$Platform$Cmd$batch(_List_Nil);
+var $elm$json$Json$Encode$object = function (pairs) {
+	return _Json_wrap(
+		A3(
+			$elm$core$List$foldl,
+			F2(
+				function (_v0, obj) {
+					var k = _v0.a;
+					var v = _v0.b;
+					return A3(_Json_addField, k, v, obj);
+				}),
+			_Json_emptyObject(_Utils_Tuple0),
+			pairs));
+};
+var $author$project$Main$AddedToQueue = {$: 'AddedToQueue'};
+var $elm$http$Http$expectBytesResponse = F2(
+	function (toMsg, toResult) {
+		return A3(
+			_Http_expect,
+			'arraybuffer',
+			_Http_toDataView,
+			A2($elm$core$Basics$composeR, toResult, toMsg));
+	});
+var $elm$http$Http$expectWhatever = function (toMsg) {
+	return A2(
+		$elm$http$Http$expectBytesResponse,
+		toMsg,
+		$elm$http$Http$resolve(
+			function (_v0) {
+				return $elm$core$Result$Ok(_Utils_Tuple0);
+			}));
+};
+var $author$project$Main$post = F3(
+	function (path, body, tok) {
+		return $elm$http$Http$request(
+			{
+				body: body,
+				expect: $elm$http$Http$expectWhatever(
+					function (_v0) {
+						return $author$project$Main$AddedToQueue;
+					}),
+				headers: _List_fromArray(
+					[
+						A2($elm$http$Http$header, 'Authorization', tok),
+						A2($elm$http$Http$header, 'Content-Type', 'application/json')
+					]),
+				method: 'GET',
+				timeout: $elm$core$Maybe$Nothing,
+				tracker: $elm$core$Maybe$Nothing,
+				url: $elm$url$Url$toString(
+					_Utils_update(
+						$author$project$Main$apiUrl,
+						{path: path}))
+			});
+	});
 var $elm$browser$Browser$Navigation$replaceUrl = _Browser_replaceUrl;
 var $elm$core$Basics$negate = function (n) {
 	return -n;
@@ -8109,8 +8169,8 @@ var $elm_community$random_extra$Random$List$shuffle = function (list) {
 		$elm$random$Random$independentSeed);
 };
 var $author$project$Main$Song = F2(
-	function (name, id) {
-		return {id: id, name: name};
+	function (name, uri) {
+		return {name: name, uri: uri};
 	});
 var $elm$json$Json$Decode$null = _Json_decodeNull;
 var $elm$json$Json$Decode$nullable = function (decoder) {
@@ -8130,7 +8190,7 @@ var $author$project$Main$songsDecoder = function () {
 		$elm$json$Json$Decode$map2,
 		$author$project$Main$Song,
 		A2($elm$json$Json$Decode$field, 'name', $elm$json$Json$Decode$string),
-		A2($elm$json$Json$Decode$field, 'id', $elm$json$Json$Decode$string));
+		A2($elm$json$Json$Decode$field, 'uri', $elm$json$Json$Decode$string));
 	var songs = A2(
 		$elm$json$Json$Decode$at,
 		_List_fromArray(
@@ -8150,6 +8210,7 @@ var $author$project$Main$songsDecoder = function () {
 		songs,
 		nextUrl);
 }();
+var $elm$json$Json$Encode$string = _Json_wrap;
 var $truqu$elm_oauth2$OAuth$tokenToString = function (_v0) {
 	var t = _v0.a;
 	return 'Bearer ' + t;
@@ -8259,11 +8320,19 @@ var $author$project$Main$update = F2(
 					}
 				case 'ShuffledState':
 					var songs = msg.a;
+					var body = $elm$http$Http$jsonBody(
+						$elm$json$Json$Encode$object(
+							_List_fromArray(
+								[
+									_Utils_Tuple2(
+									'uri',
+									$elm$json$Json$Encode$string('spotify:album:3BJUcKkbFSPXOPRz8NSRKQ'))
+								])));
 					return _Utils_Tuple2(
 						_Utils_update(
 							model,
 							{songs: songs}),
-						$elm$core$Platform$Cmd$none);
+						A3($author$project$Main$post, '/me/player/queue', body, model.authToken));
 				default:
 					break _v0$6;
 			}

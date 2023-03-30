@@ -2,10 +2,12 @@ module Main exposing (..)
 
 import Browser
 import Browser.Navigation as Nav
+import Dict
 import Html exposing (..)
 import Html.Events exposing (onClick)
 import Http
-import Json.Decode as Json
+import Json.Decode as Decode
+import Json.Encode as Encode
 import OAuth
 import OAuth.AuthorizationCode as OAuth
 import Random
@@ -43,6 +45,7 @@ type Msg
     | Shuffle Playlist
     | Songs (Result Http.Error ( List Song, Maybe String ))
     | ShuffledState (List Song)
+    | AddedToQueue
 
 
 type alias Playlist =
@@ -54,7 +57,7 @@ type alias Playlist =
 
 type alias Song =
     { name : String
-    , id : String
+    , uri : String
     }
 
 
@@ -164,7 +167,11 @@ update msg model =
             )
 
         ShuffledState songs ->
-            ( { model | songs = songs }, Cmd.none )
+            let
+                body =
+                    Http.jsonBody (Encode.object [ ( "uri", Encode.string "spotify:album:3BJUcKkbFSPXOPRz8NSRKQ" ) ])
+            in
+            ( { model | songs = songs }, post "/me/player/queue" body model.authToken )
 
         fail ->
             let
@@ -187,19 +194,19 @@ getSongs { id } tok =
 -- TODO: Handle playlists with songs whose id is null
 
 
-songsDecoder : Json.Decoder ( List Song, Maybe String )
+songsDecoder : Decode.Decoder ( List Song, Maybe String )
 songsDecoder =
     let
         fields =
-            Json.map2 Song (Json.field "name" Json.string) (Json.field "id" Json.string)
+            Decode.map2 Song (Decode.field "name" Decode.string) (Decode.field "uri" Decode.string)
 
         songs =
-            Json.at [ "items" ] (Json.list (Json.at [ "track" ] fields))
+            Decode.at [ "items" ] (Decode.list (Decode.at [ "track" ] fields))
 
         nextUrl =
-            Json.field "next" (Json.nullable Json.string)
+            Decode.field "next" (Decode.nullable Decode.string)
     in
-    Json.map2 (\x y -> ( x, y )) songs nextUrl
+    Decode.map2 (\x y -> ( x, y )) songs nextUrl
 
 
 authUrl : Url.Url
@@ -215,7 +222,7 @@ authUrl =
 
 getUsername : String -> Cmd Msg
 getUsername =
-    get "/me" (Http.expectJson Username (Json.field "id" Json.string))
+    get "/me" (Http.expectJson Username (Decode.field "id" Decode.string))
 
 
 getPlaylists : String -> Cmd Msg
@@ -223,17 +230,17 @@ getPlaylists =
     get "/me/playlists" (Http.expectJson Playlists playlistsDecoder)
 
 
-playlistsDecoder : Json.Decoder (List Playlist)
+playlistsDecoder : Decode.Decoder (List Playlist)
 playlistsDecoder =
     let
         fields =
-            Json.map3
+            Decode.map3
                 Playlist
-                (Json.field "name" Json.string)
-                (Json.field "id" Json.string)
-                (Json.at [ "tracks" ] (Json.field "total" Json.int))
+                (Decode.field "name" Decode.string)
+                (Decode.field "id" Decode.string)
+                (Decode.at [ "tracks" ] (Decode.field "total" Decode.int))
     in
-    Json.at [ "items" ] (Json.list fields)
+    Decode.at [ "items" ] (Decode.list fields)
 
 
 get : String -> Http.Expect Msg -> String -> Cmd Msg
@@ -244,6 +251,19 @@ get path expect tok =
         , url = Url.toString { apiUrl | path = path }
         , body = Http.emptyBody
         , expect = expect
+        , timeout = Nothing
+        , tracker = Nothing
+        }
+
+
+post : String -> Http.Body -> String -> Cmd Msg
+post path body tok =
+    Http.request
+        { method = "GET"
+        , headers = [ Http.header "Authorization" tok, Http.header "Content-Type" "application/json" ]
+        , url = Url.toString { apiUrl | path = path }
+        , body = body
+        , expect = Http.expectWhatever (\_ -> AddedToQueue)
         , timeout = Nothing
         , tracker = Nothing
         }
