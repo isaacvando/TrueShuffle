@@ -7793,7 +7793,7 @@ var $author$project$Main$init = F3(
 				return _List_Nil;
 			}
 		}();
-		var model = {authToken: '', key: key, playlists: p, songs: _List_Nil, username: ''};
+		var model = {authToken: '', key: key, playlists: p, username: ''};
 		var _v0 = $truqu$elm_oauth2$OAuth$AuthorizationCode$parseCode(url);
 		if (_v0.$ === 'Success') {
 			var code = _v0.a.code;
@@ -7807,42 +7807,30 @@ var $author$project$Main$init = F3(
 					$elm$url$Url$toString($author$project$Main$authUrl)));
 		}
 	});
-var $author$project$Main$Noop = {$: 'Noop'};
+var $author$project$Main$NoOp = {$: 'NoOp'};
 var $author$project$Main$onUrlChange = function (_v0) {
-	return $author$project$Main$Noop;
+	return $author$project$Main$NoOp;
 };
 var $author$project$Main$onUrlRequest = function (_v0) {
-	return $author$project$Main$Noop;
+	return $author$project$Main$NoOp;
 };
 var $elm$core$Platform$Sub$batch = _Platform_batch;
 var $elm$core$Platform$Sub$none = $elm$core$Platform$Sub$batch(_List_Nil);
 var $author$project$Main$subs = function (_v0) {
 	return $elm$core$Platform$Sub$none;
 };
-var $author$project$Main$AddedToQueue = function (a) {
-	return {$: 'AddedToQueue', a: a};
-};
-var $author$project$Main$ShuffledState = function (a) {
-	return {$: 'ShuffledState', a: a};
-};
-var $author$project$Main$Songs = function (a) {
-	return {$: 'Songs', a: a};
-};
+var $author$project$Main$AddedToQueue = F2(
+	function (a, b) {
+		return {$: 'AddedToQueue', a: a, b: b};
+	});
+var $author$project$Main$GotSongs = F2(
+	function (a, b) {
+		return {$: 'GotSongs', a: a, b: b};
+	});
 var $author$project$Main$apiUrl = _Utils_update(
 	$author$project$Main$defaultHttpsUrl,
 	{host: 'api.spotify.com/v1'});
 var $elm$core$Platform$Cmd$batch = _Platform_batch;
-var $elm$core$List$filter = F2(
-	function (isGood, list) {
-		return A3(
-			$elm$core$List$foldr,
-			F2(
-				function (x, xs) {
-					return isGood(x) ? A2($elm$core$List$cons, x, xs) : xs;
-				}),
-			_List_Nil,
-			list);
-	});
 var $elm$random$Random$Generate = function (a) {
 	return {$: 'Generate', a: a};
 };
@@ -7969,8 +7957,8 @@ var $author$project$Main$get = F3(
 						{path: path}))
 			});
 	});
-var $author$project$Main$Playlists = function (a) {
-	return {$: 'Playlists', a: a};
+var $author$project$Main$GotPlaylists = function (a) {
+	return {$: 'GotPlaylists', a: a};
 };
 var $elm$json$Json$Decode$at = F2(
 	function (fields, decoder) {
@@ -7997,17 +7985,28 @@ var $author$project$Main$playlistsDecoder = function () {
 var $author$project$Main$getPlaylists = A2(
 	$author$project$Main$get,
 	'/me/playlists',
-	A2($elm$http$Http$expectJson, $author$project$Main$Playlists, $author$project$Main$playlistsDecoder));
-var $author$project$Main$Username = function (a) {
-	return {$: 'Username', a: a};
+	A2($elm$http$Http$expectJson, $author$project$Main$GotPlaylists, $author$project$Main$playlistsDecoder));
+var $author$project$Main$GotUsername = function (a) {
+	return {$: 'GotUsername', a: a};
 };
 var $author$project$Main$getUsername = A2(
 	$author$project$Main$get,
 	'/me',
 	A2(
 		$elm$http$Http$expectJson,
-		$author$project$Main$Username,
+		$author$project$Main$GotUsername,
 		A2($elm$json$Json$Decode$field, 'id', $elm$json$Json$Decode$string)));
+var $elm$core$List$filter = F2(
+	function (isGood, list) {
+		return A3(
+			$elm$core$List$foldr,
+			F2(
+				function (x, xs) {
+					return isGood(x) ? A2($elm$core$List$cons, x, xs) : xs;
+				}),
+			_List_Nil,
+			list);
+	});
 var $author$project$Main$keepUnchanged = F2(
 	function (old, _new) {
 		var replace = function (p) {
@@ -8027,41 +8026,37 @@ var $author$project$Main$keepUnchanged = F2(
 		return A2($elm$core$List$map, replace, _new);
 	});
 var $elm$core$Debug$log = _Debug_log;
-var $elm$core$Basics$neq = _Utils_notEqual;
 var $elm$core$Platform$Cmd$none = $elm$core$Platform$Cmd$batch(_List_Nil);
-var $elm$http$Http$stringResolver = A2(_Http_expect, '', $elm$core$Basics$identity);
-var $elm$core$Task$fail = _Scheduler_fail;
-var $elm$http$Http$resultToTask = function (result) {
-	if (result.$ === 'Ok') {
-		var a = result.a;
-		return $elm$core$Task$succeed(a);
-	} else {
-		var x = result.a;
-		return $elm$core$Task$fail(x);
-	}
+var $elm$http$Http$expectBytesResponse = F2(
+	function (toMsg, toResult) {
+		return A3(
+			_Http_expect,
+			'arraybuffer',
+			_Http_toDataView,
+			A2($elm$core$Basics$composeR, toResult, toMsg));
+	});
+var $elm$http$Http$expectWhatever = function (toMsg) {
+	return A2(
+		$elm$http$Http$expectBytesResponse,
+		toMsg,
+		$elm$http$Http$resolve(
+			function (_v0) {
+				return $elm$core$Result$Ok(_Utils_Tuple0);
+			}));
 };
-var $elm$http$Http$task = function (r) {
-	return A3(
-		_Http_toTask,
-		_Utils_Tuple0,
-		$elm$http$Http$resultToTask,
-		{allowCookiesFromOtherDomains: false, body: r.body, expect: r.resolver, headers: r.headers, method: r.method, timeout: r.timeout, tracker: $elm$core$Maybe$Nothing, url: r.url});
-};
-var $author$project$Main$postTask = F2(
-	function (path, tok) {
-		return $elm$http$Http$task(
+var $author$project$Main$post = F3(
+	function (path, tok, f) {
+		return $elm$http$Http$request(
 			{
 				body: $elm$http$Http$emptyBody,
+				expect: $elm$http$Http$expectWhatever(f),
 				headers: _List_fromArray(
 					[
 						A2($elm$http$Http$header, 'Authorization', tok)
 					]),
 				method: 'POST',
-				resolver: $elm$http$Http$stringResolver(
-					function (_v0) {
-						return $elm$core$Result$Ok($author$project$Main$Noop);
-					}),
 				timeout: $elm$core$Maybe$Nothing,
+				tracker: $elm$core$Maybe$Nothing,
 				url: $elm$url$Url$toString(
 					_Utils_update(
 						$author$project$Main$apiUrl,
@@ -8288,173 +8283,161 @@ var $truqu$elm_oauth2$OAuth$tokenToString = function (_v0) {
 };
 var $author$project$Main$update = F2(
 	function (msg, model) {
-		update:
+		_v0$6:
 		while (true) {
-			_v0$7:
-			while (true) {
-				switch (msg.$) {
-					case 'GotAccessToken':
-						if (msg.a.$ === 'Ok') {
-							var a = msg.a.a;
-							var tok = $truqu$elm_oauth2$OAuth$tokenToString(a.token);
-							return _Utils_Tuple2(
-								_Utils_update(
-									model,
-									{authToken: tok}),
-								$elm$core$Platform$Cmd$batch(
-									_List_fromArray(
-										[
-											A2(
-											$elm$browser$Browser$Navigation$replaceUrl,
-											model.key,
-											$elm$url$Url$toString($author$project$Main$homeUrl)),
-											$author$project$Main$getUsername(tok),
-											$author$project$Main$getPlaylists(tok)
-										])));
-						} else {
-							break _v0$7;
-						}
-					case 'Username':
-						if (msg.a.$ === 'Ok') {
-							var name = msg.a.a;
-							return _Utils_Tuple2(
-								_Utils_update(
-									model,
-									{username: name}),
-								$elm$core$Platform$Cmd$none);
-						} else {
-							break _v0$7;
-						}
-					case 'Playlists':
-						if (msg.a.$ === 'Ok') {
-							var playlists = msg.a.a;
-							return _Utils_Tuple2(
-								_Utils_update(
-									model,
-									{
-										playlists: A2($author$project$Main$keepUnchanged, model.playlists, playlists)
-									}),
-								$elm$core$Platform$Cmd$none);
-						} else {
-							break _v0$7;
-						}
-					case 'Shuffle':
-						var p = msg.a;
+			switch (msg.$) {
+				case 'GotAccessToken':
+					if (msg.a.$ === 'Ok') {
+						var a = msg.a.a;
+						var tok = $truqu$elm_oauth2$OAuth$tokenToString(a.token);
+						return _Utils_Tuple2(
+							_Utils_update(
+								model,
+								{authToken: tok}),
+							$elm$core$Platform$Cmd$batch(
+								_List_fromArray(
+									[
+										A2(
+										$elm$browser$Browser$Navigation$replaceUrl,
+										model.key,
+										$elm$url$Url$toString($author$project$Main$homeUrl)),
+										$author$project$Main$getUsername(tok),
+										$author$project$Main$getPlaylists(tok)
+									])));
+					} else {
+						break _v0$6;
+					}
+				case 'GotUsername':
+					if (msg.a.$ === 'Ok') {
+						var name = msg.a.a;
+						return _Utils_Tuple2(
+							_Utils_update(
+								model,
+								{username: name}),
+							$elm$core$Platform$Cmd$none);
+					} else {
+						break _v0$6;
+					}
+				case 'GotPlaylists':
+					if (msg.a.$ === 'Ok') {
+						var playlists = msg.a.a;
 						return _Utils_Tuple2(
 							_Utils_update(
 								model,
 								{
-									playlists: A2(
-										$elm$core$List$cons,
-										p,
-										A2(
-											$elm$core$List$filter,
-											$elm$core$Basics$neq(p),
-											model.playlists)),
-									songs: _List_Nil
+									playlists: A2($author$project$Main$keepUnchanged, model.playlists, playlists)
 								}),
-							_Utils_eq(model.songs, _List_Nil) ? A3(
-								$author$project$Main$get,
-								'/playlists/' + (p.id + '/tracks'),
-								A2($elm$http$Http$expectJson, $author$project$Main$Songs, $author$project$Main$songsDecoder),
-								model.authToken) : $elm$core$Platform$Cmd$none);
-					case 'Songs':
-						if (msg.a.$ === 'Ok') {
-							var _v1 = msg.a.a;
-							var songs = _v1.a;
-							var nextQuery = _v1.b;
-							var m = _Utils_update(
-								model,
-								{
-									songs: _Utils_ap(model.songs, songs)
-								});
-							return _Utils_Tuple2(
-								m,
-								function () {
-									if (nextQuery.$ === 'Nothing') {
-										return $elm$core$Platform$Cmd$batch(
-											_List_fromArray(
-												[
-													A2(
-													$elm$random$Random$generate,
-													$author$project$Main$ShuffledState,
-													$elm_community$random_extra$Random$List$shuffle(m.songs)),
-													$author$project$Main$setStorage(
-													$author$project$Main$storageEncoder(model.playlists))
-												]));
-									} else {
-										var fullUrl = nextQuery.a;
-										var path = A2(
-											$elm$core$String$dropLeft,
-											$elm$core$String$length(
-												$elm$url$Url$toString($author$project$Main$apiUrl)),
-											fullUrl);
-										return A3(
-											$author$project$Main$get,
-											path,
-											A2($elm$http$Http$expectJson, $author$project$Main$Songs, $author$project$Main$songsDecoder),
-											model.authToken);
-									}
-								}());
-						} else {
-							break _v0$7;
-						}
-					case 'ShuffledState':
-						var songs = msg.a;
-						var $temp$msg = $author$project$Main$AddedToQueue(0),
-							$temp$model = _Utils_update(
+							$elm$core$Platform$Cmd$none);
+					} else {
+						break _v0$6;
+					}
+				case 'ClickedShuffle':
+					var p = msg.a;
+					return _Utils_Tuple2(
+						model,
+						_Utils_eq(p.songs, _List_Nil) ? A3(
+							$author$project$Main$get,
+							'/playlists/' + (p.id + '/tracks'),
+							A2(
+								$elm$http$Http$expectJson,
+								$author$project$Main$GotSongs(p),
+								$author$project$Main$songsDecoder),
+							model.authToken) : $elm$core$Platform$Cmd$none);
+				case 'GotSongs':
+					if (msg.b.$ === 'Ok') {
+						var p = msg.a;
+						var _v1 = msg.b.a;
+						var songs = _v1.a;
+						var nextQuery = _v1.b;
+						var newP = _Utils_update(
+							p,
+							{
+								songs: _Utils_ap(p.songs, songs)
+							});
+						return _Utils_Tuple2(
 							model,
-							{songs: songs});
-						msg = $temp$msg;
-						model = $temp$model;
-						continue update;
-					case 'AddedToQueue':
-						var count = msg.a;
-						var _v3 = model.songs;
-						if (_v3.b) {
-							var x = _v3.a;
-							var xs = _v3.b;
-							var m = _Utils_update(
-								model,
-								{
-									songs: _Utils_ap(
-										xs,
+							function () {
+								if (nextQuery.$ === 'Nothing') {
+									return $elm$core$Platform$Cmd$batch(
 										_List_fromArray(
-											[x]))
-								});
-							return (_Utils_eq(
-								count,
-								$elm$core$List$length(model.songs)) || (count === 250)) ? _Utils_Tuple2(m, $elm$core$Platform$Cmd$none) : _Utils_Tuple2(
-								m,
-								A2(
-									$elm$core$Task$perform,
-									function (_v4) {
-										return $author$project$Main$AddedToQueue(count + 1);
-									},
-									A2($author$project$Main$postTask, '/me/player/queue?uri=' + x.uri, model.authToken)));
-						} else {
-							return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
-						}
-					default:
-						break _v0$7;
-				}
+											[
+												A2(
+												$elm$random$Random$generate,
+												$author$project$Main$AddedToQueue(0),
+												$elm_community$random_extra$Random$List$shuffle(newP.songs)),
+												$author$project$Main$setStorage(
+												$author$project$Main$storageEncoder(
+													A2(
+														$author$project$Main$keepUnchanged,
+														_List_fromArray(
+															[newP]),
+														model.playlists)))
+											]));
+								} else {
+									var fullUrl = nextQuery.a;
+									var path = A2(
+										$elm$core$String$dropLeft,
+										$elm$core$String$length(
+											$elm$url$Url$toString($author$project$Main$apiUrl)),
+										fullUrl);
+									return A3(
+										$author$project$Main$get,
+										path,
+										A2(
+											$elm$http$Http$expectJson,
+											$author$project$Main$GotSongs(newP),
+											$author$project$Main$songsDecoder),
+										model.authToken);
+								}
+							}());
+					} else {
+						break _v0$6;
+					}
+				case 'AddedToQueue':
+					var count = msg.a;
+					var songs = msg.b;
+					if (songs.b) {
+						var x = songs.a;
+						var xs = songs.b;
+						return (_Utils_eq(
+							count,
+							$elm$core$List$length(songs)) || (count === 100)) ? _Utils_Tuple2(model, $elm$core$Platform$Cmd$none) : _Utils_Tuple2(
+							model,
+							A3(
+								$author$project$Main$post,
+								'/me/player/queue?uri=' + x.uri,
+								model.authToken,
+								function (_v4) {
+									return A2(
+										$author$project$Main$AddedToQueue,
+										count + 1,
+										_Utils_ap(
+											xs,
+											_List_fromArray(
+												[x])));
+								}));
+					} else {
+						return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
+					}
+				default:
+					break _v0$6;
 			}
-			var fail = msg;
-			var _v5 = A2($elm$core$Debug$log, 'fail msg', msg);
-			return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 		}
+		var fail = msg;
+		var _v5 = A2($elm$core$Debug$log, 'fail msg', msg);
+		return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 	});
 var $elm$json$Json$Decode$value = _Json_decodeValue;
 var $elm$html$Html$br = _VirtualDom_node('br');
 var $elm$html$Html$h1 = _VirtualDom_node('h1');
-var $elm$html$Html$li = _VirtualDom_node('li');
 var $elm$virtual_dom$VirtualDom$text = _VirtualDom_text;
 var $elm$html$Html$text = $elm$virtual_dom$VirtualDom$text;
 var $elm$html$Html$ul = _VirtualDom_node('ul');
-var $author$project$Main$Shuffle = function (a) {
-	return {$: 'Shuffle', a: a};
+var $author$project$Main$ClickedShuffle = function (a) {
+	return {$: 'ClickedShuffle', a: a};
 };
 var $elm$html$Html$button = _VirtualDom_node('button');
+var $elm$html$Html$li = _VirtualDom_node('li');
 var $elm$virtual_dom$VirtualDom$Normal = function (a) {
 	return {$: 'Normal', a: a};
 };
@@ -8483,7 +8466,7 @@ var $author$project$Main$viewPlaylist = function (p) {
 				_List_fromArray(
 					[
 						$elm$html$Html$Events$onClick(
-						$author$project$Main$Shuffle(p))
+						$author$project$Main$ClickedShuffle(p))
 					]),
 				_List_fromArray(
 					[
@@ -8510,25 +8493,7 @@ var $author$project$Main$view = function (model) {
 				A2(
 				$elm$html$Html$ul,
 				_List_Nil,
-				A2($elm$core$List$map, $author$project$Main$viewPlaylist, model.playlists)),
-				A2(
-				$elm$html$Html$ul,
-				_List_Nil,
-				A2(
-					$elm$core$List$map,
-					function (s) {
-						return A2(
-							$elm$html$Html$li,
-							_List_Nil,
-							_List_fromArray(
-								[
-									$elm$html$Html$text(s.name)
-								]));
-					},
-					model.songs)),
-				$elm$html$Html$text(
-				$elm$core$String$fromInt(
-					$elm$core$List$length(model.songs)))
+				A2($elm$core$List$map, $author$project$Main$viewPlaylist, model.playlists))
 			]),
 		title: 'True Shuffle'
 	};

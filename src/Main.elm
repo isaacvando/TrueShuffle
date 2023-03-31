@@ -35,19 +35,18 @@ type alias Model =
     , key : Nav.Key
     , username : String
     , playlists : List Playlist
-    , songs : List Song
     }
 
 
 type Msg
     = GotAccessToken (Result Http.Error OAuth.AuthenticationSuccess)
-    | Noop
-    | Username (Result Http.Error String)
-    | Playlists (Result Http.Error (List Playlist))
-    | Shuffle Playlist
-    | Songs (Result Http.Error ( List Song, Maybe String ))
-    | ShuffledState (List Song)
-    | AddedToQueue Int
+    | NoOp
+    | GotUsername (Result Http.Error String)
+    | GotPlaylists (Result Http.Error (List Playlist))
+    | ClickedShuffle Playlist
+    | GotSongs Playlist (Result Http.Error ( List Song, Maybe String ))
+    | ShuffledSongs Playlist
+    | AddedToQueue Int (List Song)
 
 
 type alias Playlist =
@@ -108,7 +107,7 @@ init flags url key =
                     []
 
         model =
-            { authToken = "", key = key, username = "", playlists = p, songs = [] }
+            { authToken = "", key = key, username = "", playlists = p }
     in
     case OAuth.parseCode url of
         OAuth.Success { code } ->
@@ -152,33 +151,32 @@ update msg model =
                 ]
             )
 
-        Username (Ok name) ->
+        GotUsername (Ok name) ->
             ( { model | username = name }, Cmd.none )
 
-        Playlists (Ok playlists) ->
+        GotPlaylists (Ok playlists) ->
             ( { model | playlists = keepUnchanged model.playlists playlists }, Cmd.none )
 
-        --- get rid of songs on the model. This is all messed up lol
-        Shuffle p ->
-            ( { model | playlists = p :: List.filter ((/=) p) model.playlists, songs = [] }
+        ClickedShuffle p ->
+            ( model
             , if p.songs == [] then
-                get ("/playlists/" ++ p.id ++ "/tracks") (Http.expectJson Songs songsDecoder) model.authToken
+                get ("/playlists/" ++ p.id ++ "/tracks") (Http.expectJson (GotSongs p) songsDecoder) model.authToken
 
               else
                 Cmd.none
             )
 
-        Songs (Ok ( songs, nextQuery )) ->
+        GotSongs p (Ok ( songs, nextQuery )) ->
             let
-                m =
-                    { model | songs = model.songs ++ songs }
+                newP =
+                    { p | songs = p.songs ++ songs }
             in
-            ( m
+            ( model
             , case nextQuery of
                 Nothing ->
                     Cmd.batch
-                        [ Random.generate ShuffledState (Random.List.shuffle m.songs)
-                        , setStorage (storageEncoder model.playlists)
+                        [ Random.generate (AddedToQueue 0) (Random.List.shuffle newP.songs)
+                        , setStorage (storageEncoder (keepUnchanged [ newP ] model.playlists)) -- This is not great
                         ]
 
                 Just fullUrl ->
@@ -186,26 +184,21 @@ update msg model =
                         path =
                             String.dropLeft (String.length (Url.toString apiUrl)) fullUrl
                     in
-                    get path (Http.expectJson Songs songsDecoder) model.authToken
+                    get path (Http.expectJson (GotSongs newP) songsDecoder) model.authToken
             )
 
-        ShuffledState songs ->
-            update (AddedToQueue 0) { model | songs = songs }
-
-        AddedToQueue count ->
-            case model.songs of
+        AddedToQueue count songs ->
+            case songs of
                 x :: xs ->
-                    let
-                        m =
-                            { model | songs = xs ++ [ x ] }
-                    in
-                    if count == List.length model.songs || count == 250 then
-                        ( m, Cmd.none )
+                    if count == List.length songs || count == 100 then
+                        ( model, Cmd.none )
 
                     else
-                        ( m
-                        , postTask ("/me/player/queue?uri=" ++ x.uri) model.authToken
-                            |> Task.perform (\_ -> AddedToQueue (count + 1))
+                        ( model
+                        , post
+                            ("/me/player/queue?uri=" ++ x.uri)
+                            model.authToken
+                            (\_ -> AddedToQueue (count + 1) (xs ++ [ x ]))
                         )
 
                 [] ->
@@ -238,8 +231,8 @@ keepUnchanged old new =
 
 
 getSongs : Playlist -> String -> Cmd Msg
-getSongs { id } tok =
-    get ("/playlists/" ++ id ++ "/tracks") (Http.expectJson Songs songsDecoder) tok
+getSongs p tok =
+    get ("/playlists/" ++ p.id ++ "/tracks") (Http.expectJson (GotSongs p) songsDecoder) tok
 
 
 
@@ -274,12 +267,12 @@ authUrl =
 
 getUsername : String -> Cmd Msg
 getUsername =
-    get "/me" (Http.expectJson Username (Decode.field "id" Decode.string))
+    get "/me" (Http.expectJson GotUsername (Decode.field "id" Decode.string))
 
 
 getPlaylists : String -> Cmd Msg
 getPlaylists =
-    get "/me/playlists" (Http.expectJson Playlists playlistsDecoder)
+    get "/me/playlists" (Http.expectJson GotPlaylists playlistsDecoder)
 
 
 playlistsDecoder : Decode.Decoder (List Playlist)
@@ -347,14 +340,14 @@ get path expect tok =
         }
 
 
-post : String -> String -> Cmd Msg
-post path tok =
+post : String -> String -> (Result Http.Error () -> Msg) -> Cmd Msg
+post path tok f =
     Http.request
         { method = "POST"
         , headers = [ Http.header "Authorization" tok ]
         , url = Url.toString { apiUrl | path = path }
         , body = Http.emptyBody
-        , expect = Http.expectWhatever (\_ -> Noop)
+        , expect = Http.expectWhatever f
         , timeout = Nothing
         , tracker = Nothing
         }
@@ -367,7 +360,7 @@ postTask path tok =
         , headers = [ Http.header "Authorization" tok ]
         , url = Url.toString { apiUrl | path = path }
         , body = Http.emptyBody
-        , resolver = Http.stringResolver (\_ -> Ok Noop)
+        , resolver = Http.stringResolver (\_ -> Ok NoOp)
         , timeout = Nothing
         }
 
@@ -397,15 +390,13 @@ view model =
         , text <| "Welcome, " ++ model.username ++ "!"
         , br [] []
         , ul [] (List.map viewPlaylist model.playlists)
-        , ul [] (List.map (\s -> li [] [ text s.name ]) model.songs)
-        , text (String.fromInt (List.length model.songs))
         ]
     }
 
 
 viewPlaylist : Playlist -> Html Msg
 viewPlaylist p =
-    li [] [ button [ onClick (Shuffle p) ] [ text p.name ], text "  ", text (String.fromInt p.length) ]
+    li [] [ button [ onClick (ClickedShuffle p) ] [ text p.name ], text "  ", text (String.fromInt p.length) ]
 
 
 
@@ -423,12 +414,12 @@ subs _ =
 
 onUrlRequest : Browser.UrlRequest -> Msg
 onUrlRequest _ =
-    Noop
+    NoOp
 
 
 onUrlChange : Url.Url -> Msg
 onUrlChange _ =
-    Noop
+    NoOp
 
 
 
