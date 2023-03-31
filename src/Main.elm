@@ -156,11 +156,16 @@ update msg model =
             ( { model | username = name }, Cmd.none )
 
         Playlists (Ok playlists) ->
-            ( { model | playlists = playlists }, Cmd.none )
+            ( { model | playlists = keepUnchanged model.playlists playlists }, Cmd.none )
 
+        --- get rid of songs on the model. This is all messed up lol
         Shuffle p ->
             ( { model | playlists = p :: List.filter ((/=) p) model.playlists, songs = [] }
-            , get ("/playlists/" ++ p.id ++ "/tracks") (Http.expectJson Songs songsDecoder) model.authToken
+            , if p.songs == [] then
+                get ("/playlists/" ++ p.id ++ "/tracks") (Http.expectJson Songs songsDecoder) model.authToken
+
+              else
+                Cmd.none
             )
 
         Songs (Ok ( songs, nextQuery )) ->
@@ -171,7 +176,10 @@ update msg model =
             ( m
             , case nextQuery of
                 Nothing ->
-                    Random.generate ShuffledState (Random.List.shuffle m.songs)
+                    Cmd.batch
+                        [ Random.generate ShuffledState (Random.List.shuffle m.songs)
+                        , setStorage (storageEncoder model.playlists)
+                        ]
 
                 Just fullUrl ->
                     let
@@ -211,8 +219,22 @@ update msg model =
             ( model, Cmd.none )
 
 
+keepUnchanged : List Playlist -> List Playlist -> List Playlist
+keepUnchanged old new =
+    let
+        replace p =
+            case List.filter (\x -> x.id == p.id) old of
+                [] ->
+                    p
 
--- queue : Model -> Cmd Msg
+                x :: _ ->
+                    if x.snapshot == p.snapshot then
+                        x
+
+                    else
+                        p
+    in
+    List.map replace new
 
 
 getSongs : Playlist -> String -> Cmd Msg
@@ -277,12 +299,39 @@ playlistsDecoder =
 storageDecoder : Decode.Decoder (List Playlist)
 storageDecoder =
     Decode.list <|
-        Decode.map4
-            (Playlist [])
+        Decode.map5
+            Playlist
+            (Decode.list <|
+                Decode.map2
+                    Song
+                    (Decode.field "name" Decode.string)
+                    (Decode.field "id" Decode.string)
+            )
             (Decode.field "name" Decode.string)
             (Decode.field "id" Decode.string)
             (Decode.field "length" Decode.int)
             (Decode.field "snapshot" Decode.string)
+
+
+storageEncoder : List Playlist -> Encode.Value
+storageEncoder ps =
+    let
+        encodeSong s =
+            Encode.object
+                [ ( "name", Encode.string s.name )
+                , ( "uri", Encode.string s.uri )
+                ]
+
+        item p =
+            Encode.object
+                [ ( "songs", Encode.list encodeSong p.songs )
+                , ( "name", Encode.string p.name )
+                , ( "id", Encode.string p.id )
+                , ( "length", Encode.int p.length )
+                , ( "snapshot", Encode.string p.snapshot )
+                ]
+    in
+    Encode.list item ps
 
 
 get : String -> Http.Expect Msg -> String -> Cmd Msg
@@ -356,7 +405,7 @@ view model =
 
 viewPlaylist : Playlist -> Html Msg
 viewPlaylist p =
-    li [] [ button [ onClick (Shuffle p) ] [ text p.name ], text "  ", text (String.fromInt p.length), text "  ", text p.snapshot ]
+    li [] [ button [ onClick (Shuffle p) ] [ text p.name ], text "  ", text (String.fromInt p.length) ]
 
 
 

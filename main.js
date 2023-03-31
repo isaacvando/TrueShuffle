@@ -7763,10 +7763,21 @@ var $author$project$Main$Playlist = F5(
 	function (songs, name, id, length, snapshot) {
 		return {id: id, length: length, name: name, snapshot: snapshot, songs: songs};
 	});
+var $author$project$Main$Song = F2(
+	function (name, uri) {
+		return {name: name, uri: uri};
+	});
+var $elm$json$Json$Decode$map5 = _Json_map5;
 var $author$project$Main$storageDecoder = $elm$json$Json$Decode$list(
-	A5(
-		$elm$json$Json$Decode$map4,
-		$author$project$Main$Playlist(_List_Nil),
+	A6(
+		$elm$json$Json$Decode$map5,
+		$author$project$Main$Playlist,
+		$elm$json$Json$Decode$list(
+			A3(
+				$elm$json$Json$Decode$map2,
+				$author$project$Main$Song,
+				A2($elm$json$Json$Decode$field, 'name', $elm$json$Json$Decode$string),
+				A2($elm$json$Json$Decode$field, 'id', $elm$json$Json$Decode$string))),
 		A2($elm$json$Json$Decode$field, 'name', $elm$json$Json$Decode$string),
 		A2($elm$json$Json$Decode$field, 'id', $elm$json$Json$Decode$string),
 		A2($elm$json$Json$Decode$field, 'length', $elm$json$Json$Decode$int),
@@ -7997,6 +8008,24 @@ var $author$project$Main$getUsername = A2(
 		$elm$http$Http$expectJson,
 		$author$project$Main$Username,
 		A2($elm$json$Json$Decode$field, 'id', $elm$json$Json$Decode$string)));
+var $author$project$Main$keepUnchanged = F2(
+	function (old, _new) {
+		var replace = function (p) {
+			var _v0 = A2(
+				$elm$core$List$filter,
+				function (x) {
+					return _Utils_eq(x.id, p.id);
+				},
+				old);
+			if (!_v0.b) {
+				return p;
+			} else {
+				var x = _v0.a;
+				return _Utils_eq(x.snapshot, p.snapshot) ? x : p;
+			}
+		};
+		return A2($elm$core$List$map, replace, _new);
+	});
 var $elm$core$Debug$log = _Debug_log;
 var $elm$core$Basics$neq = _Utils_notEqual;
 var $elm$core$Platform$Cmd$none = $elm$core$Platform$Cmd$batch(_List_Nil);
@@ -8040,6 +8069,7 @@ var $author$project$Main$postTask = F2(
 			});
 	});
 var $elm$browser$Browser$Navigation$replaceUrl = _Browser_replaceUrl;
+var $author$project$Main$setStorage = _Platform_outgoingPort('setStorage', $elm$core$Basics$identity);
 var $elm$core$Basics$negate = function (n) {
 	return -n;
 };
@@ -8154,10 +8184,6 @@ var $elm_community$random_extra$Random$List$shuffle = function (list) {
 		},
 		$elm$random$Random$independentSeed);
 };
-var $author$project$Main$Song = F2(
-	function (name, uri) {
-		return {name: name, uri: uri};
-	});
 var $elm$json$Json$Decode$null = _Json_decodeNull;
 var $elm$json$Json$Decode$nullable = function (decoder) {
 	return $elm$json$Json$Decode$oneOf(
@@ -8196,6 +8222,66 @@ var $author$project$Main$songsDecoder = function () {
 		songs,
 		nextUrl);
 }();
+var $elm$json$Json$Encode$int = _Json_wrap;
+var $elm$json$Json$Encode$list = F2(
+	function (func, entries) {
+		return _Json_wrap(
+			A3(
+				$elm$core$List$foldl,
+				_Json_addEntry(func),
+				_Json_emptyArray(_Utils_Tuple0),
+				entries));
+	});
+var $elm$json$Json$Encode$object = function (pairs) {
+	return _Json_wrap(
+		A3(
+			$elm$core$List$foldl,
+			F2(
+				function (_v0, obj) {
+					var k = _v0.a;
+					var v = _v0.b;
+					return A3(_Json_addField, k, v, obj);
+				}),
+			_Json_emptyObject(_Utils_Tuple0),
+			pairs));
+};
+var $elm$json$Json$Encode$string = _Json_wrap;
+var $author$project$Main$storageEncoder = function (ps) {
+	var encodeSong = function (s) {
+		return $elm$json$Json$Encode$object(
+			_List_fromArray(
+				[
+					_Utils_Tuple2(
+					'name',
+					$elm$json$Json$Encode$string(s.name)),
+					_Utils_Tuple2(
+					'uri',
+					$elm$json$Json$Encode$string(s.uri))
+				]));
+	};
+	var item = function (p) {
+		return $elm$json$Json$Encode$object(
+			_List_fromArray(
+				[
+					_Utils_Tuple2(
+					'songs',
+					A2($elm$json$Json$Encode$list, encodeSong, p.songs)),
+					_Utils_Tuple2(
+					'name',
+					$elm$json$Json$Encode$string(p.name)),
+					_Utils_Tuple2(
+					'id',
+					$elm$json$Json$Encode$string(p.id)),
+					_Utils_Tuple2(
+					'length',
+					$elm$json$Json$Encode$int(p.length)),
+					_Utils_Tuple2(
+					'snapshot',
+					$elm$json$Json$Encode$string(p.snapshot))
+				]));
+	};
+	return A2($elm$json$Json$Encode$list, item, ps);
+};
 var $truqu$elm_oauth2$OAuth$tokenToString = function (_v0) {
 	var t = _v0.a;
 	return 'Bearer ' + t;
@@ -8245,7 +8331,9 @@ var $author$project$Main$update = F2(
 							return _Utils_Tuple2(
 								_Utils_update(
 									model,
-									{playlists: playlists}),
+									{
+										playlists: A2($author$project$Main$keepUnchanged, model.playlists, playlists)
+									}),
 								$elm$core$Platform$Cmd$none);
 						} else {
 							break _v0$7;
@@ -8265,11 +8353,11 @@ var $author$project$Main$update = F2(
 											model.playlists)),
 									songs: _List_Nil
 								}),
-							A3(
+							_Utils_eq(model.songs, _List_Nil) ? A3(
 								$author$project$Main$get,
 								'/playlists/' + (p.id + '/tracks'),
 								A2($elm$http$Http$expectJson, $author$project$Main$Songs, $author$project$Main$songsDecoder),
-								model.authToken));
+								model.authToken) : $elm$core$Platform$Cmd$none);
 					case 'Songs':
 						if (msg.a.$ === 'Ok') {
 							var _v1 = msg.a.a;
@@ -8284,10 +8372,16 @@ var $author$project$Main$update = F2(
 								m,
 								function () {
 									if (nextQuery.$ === 'Nothing') {
-										return A2(
-											$elm$random$Random$generate,
-											$author$project$Main$ShuffledState,
-											$elm_community$random_extra$Random$List$shuffle(m.songs));
+										return $elm$core$Platform$Cmd$batch(
+											_List_fromArray(
+												[
+													A2(
+													$elm$random$Random$generate,
+													$author$project$Main$ShuffledState,
+													$elm_community$random_extra$Random$List$shuffle(m.songs)),
+													$author$project$Main$setStorage(
+													$author$project$Main$storageEncoder(model.playlists))
+												]));
 									} else {
 										var fullUrl = nextQuery.a;
 										var path = A2(
@@ -8397,9 +8491,7 @@ var $author$project$Main$viewPlaylist = function (p) {
 					])),
 				$elm$html$Html$text('  '),
 				$elm$html$Html$text(
-				$elm$core$String$fromInt(p.length)),
-				$elm$html$Html$text('  '),
-				$elm$html$Html$text(p.snapshot)
+				$elm$core$String$fromInt(p.length))
 			]));
 };
 var $author$project$Main$view = function (model) {

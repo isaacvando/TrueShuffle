@@ -19,6 +19,7 @@
 
 		app.ports.setStorage.subscribe(function (state) {
 			localStorage.setItem('state', JSON.stringify(state));
+			console.log("Set the state: ", state)
 		});
 	</script>
 </body>
