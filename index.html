@@ -7800,6 +7800,7 @@ var $elm$core$Platform$Sub$none = $elm$core$Platform$Sub$batch(_List_Nil);
 var $author$project$Main$subs = function (_v0) {
 	return $elm$core$Platform$Sub$none;
 };
+var $author$project$Main$AddedToQueue = {$: 'AddedToQueue'};
 var $author$project$Main$ShuffledState = function (a) {
 	return {$: 'ShuffledState', a: a};
 };
@@ -7993,40 +7994,39 @@ var $author$project$Main$getUsername = A2(
 var $elm$core$Debug$log = _Debug_log;
 var $elm$core$Basics$neq = _Utils_notEqual;
 var $elm$core$Platform$Cmd$none = $elm$core$Platform$Cmd$batch(_List_Nil);
-var $author$project$Main$AddedToQueue = {$: 'AddedToQueue'};
-var $elm$http$Http$expectBytesResponse = F2(
-	function (toMsg, toResult) {
-		return A3(
-			_Http_expect,
-			'arraybuffer',
-			_Http_toDataView,
-			A2($elm$core$Basics$composeR, toResult, toMsg));
-	});
-var $elm$http$Http$expectWhatever = function (toMsg) {
-	return A2(
-		$elm$http$Http$expectBytesResponse,
-		toMsg,
-		$elm$http$Http$resolve(
-			function (_v0) {
-				return $elm$core$Result$Ok(_Utils_Tuple0);
-			}));
+var $elm$http$Http$stringResolver = A2(_Http_expect, '', $elm$core$Basics$identity);
+var $elm$core$Task$fail = _Scheduler_fail;
+var $elm$http$Http$resultToTask = function (result) {
+	if (result.$ === 'Ok') {
+		var a = result.a;
+		return $elm$core$Task$succeed(a);
+	} else {
+		var x = result.a;
+		return $elm$core$Task$fail(x);
+	}
 };
-var $author$project$Main$post = F2(
+var $elm$http$Http$task = function (r) {
+	return A3(
+		_Http_toTask,
+		_Utils_Tuple0,
+		$elm$http$Http$resultToTask,
+		{allowCookiesFromOtherDomains: false, body: r.body, expect: r.resolver, headers: r.headers, method: r.method, timeout: r.timeout, tracker: $elm$core$Maybe$Nothing, url: r.url});
+};
+var $author$project$Main$postTask = F2(
 	function (path, tok) {
-		return $elm$http$Http$request(
+		return $elm$http$Http$task(
 			{
 				body: $elm$http$Http$emptyBody,
-				expect: $elm$http$Http$expectWhatever(
-					function (_v0) {
-						return $author$project$Main$AddedToQueue;
-					}),
 				headers: _List_fromArray(
 					[
 						A2($elm$http$Http$header, 'Authorization', tok)
 					]),
 				method: 'POST',
+				resolver: $elm$http$Http$stringResolver(
+					function (_v0) {
+						return $elm$core$Result$Ok($author$project$Main$Noop);
+					}),
 				timeout: $elm$core$Maybe$Nothing,
-				tracker: $elm$core$Maybe$Nothing,
 				url: $elm$url$Url$toString(
 					_Utils_update(
 						$author$project$Main$apiUrl,
@@ -8148,6 +8148,7 @@ var $elm_community$random_extra$Random$List$shuffle = function (list) {
 		},
 		$elm$random$Random$independentSeed);
 };
+var $elm$core$Process$sleep = _Process_sleep;
 var $author$project$Main$Song = F2(
 	function (name, uri) {
 		return {name: name, uri: uri};
@@ -8425,6 +8426,19 @@ var $author$project$Main$update = F2(
 					}
 				case 'ShuffledState':
 					var songs = msg.a;
+					var makeTask = function (song) {
+						return A2(
+							$elm$core$Task$perform,
+							function (_v4) {
+								return $author$project$Main$AddedToQueue;
+							},
+							A2(
+								$elm$core$Task$andThen,
+								function (_v3) {
+									return $elm$core$Process$sleep(100000000);
+								},
+								A2($author$project$Main$postTask, '/me/player/queue?uri=' + song.uri, model.authToken)));
+					};
 					return _Utils_Tuple2(
 						_Utils_update(
 							model,
@@ -8432,16 +8446,14 @@ var $author$project$Main$update = F2(
 						$elm$core$Platform$Cmd$batch(
 							A2(
 								$elm$core$List$map,
-								function (s) {
-									return A2($author$project$Main$post, '/me/player/queue?uri=' + s.uri, model.authToken);
-								},
+								makeTask,
 								A2($elm$core$List$take, 100, songs))));
 				default:
 					break _v0$6;
 			}
 		}
 		var fail = msg;
-		var _v3 = A2($elm$core$Debug$log, 'fail msg', msg);
+		var _v5 = A2($elm$core$Debug$log, 'fail msg', msg);
 		return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 	});
 var $elm$html$Html$br = _VirtualDom_node('br');
@@ -8520,9 +8532,7 @@ var $author$project$Main$view = function (model) {
 							_List_Nil,
 							_List_fromArray(
 								[
-									$elm$html$Html$text(s.name),
-									$elm$html$Html$text(' '),
-									$elm$html$Html$text(s.uri)
+									$elm$html$Html$text(s.name)
 								]));
 					},
 					model.songs)),

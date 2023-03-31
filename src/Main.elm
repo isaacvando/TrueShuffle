@@ -10,8 +10,10 @@ import Json.Decode as Decode
 import Json.Encode as Encode
 import OAuth
 import OAuth.AuthorizationCode as OAuth
+import Process
 import Random
 import Random.List
+import Task
 import Url exposing (Protocol(..))
 import Url.Parser exposing ((<?>))
 
@@ -167,8 +169,14 @@ update msg model =
             )
 
         ShuffledState songs ->
+            let
+                makeTask song =
+                    postTask ("/me/player/queue?uri=" ++ song.uri) model.authToken
+                        |> Task.andThen (\_ -> Process.sleep 100000000)
+                        |> Task.perform (\_ -> AddedToQueue)
+            in
             ( { model | songs = songs }
-            , Cmd.batch (List.map (\s -> post ("/me/player/queue?uri=" ++ s.uri) model.authToken) (List.take 100 songs))
+            , Cmd.batch (List.map makeTask (List.take 100 songs))
             )
 
         fail ->
@@ -267,6 +275,18 @@ post path tok =
         }
 
 
+postTask : String -> String -> Task.Task Never Msg
+postTask path tok =
+    Http.task
+        { method = "POST"
+        , headers = [ Http.header "Authorization" tok ]
+        , url = Url.toString { apiUrl | path = path }
+        , body = Http.emptyBody
+        , resolver = Http.stringResolver (\_ -> Ok Noop)
+        , timeout = Nothing
+        }
+
+
 req : { path : String, token : String, method : String, expect : Http.Expect Msg } -> Cmd Msg
 req args =
     Http.request
@@ -292,7 +312,7 @@ view model =
         , text <| "Welcome, " ++ model.username ++ "!"
         , br [] []
         , ul [] (List.map viewPlaylist model.playlists)
-        , ul [] (List.map (\s -> li [] [ text s.name, text " ", text s.uri ]) model.songs)
+        , ul [] (List.map (\s -> li [] [ text s.name ]) model.songs)
         , text (String.fromInt (List.length model.songs))
         ]
     }
