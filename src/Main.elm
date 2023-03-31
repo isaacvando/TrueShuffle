@@ -1,4 +1,4 @@
-module Main exposing (..)
+port module Main exposing (..)
 
 import Browser
 import Browser.Navigation as Nav
@@ -18,7 +18,7 @@ import Url exposing (Protocol(..))
 import Url.Parser exposing ((<?>))
 
 
-main : Program () Model Msg
+main : Program Encode.Value Model Msg
 main =
     Browser.application
         { init = init
@@ -51,9 +51,11 @@ type Msg
 
 
 type alias Playlist =
-    { name : String
+    { songs : List Song
+    , name : String
     , id : String
     , length : Int
+    , snapshot : String
     }
 
 
@@ -61,6 +63,9 @@ type alias Song =
     { name : String
     , uri : String
     }
+
+
+port setStorage : Encode.Value -> Cmd a
 
 
 
@@ -91,11 +96,19 @@ clientId =
 -- INIT
 
 
-init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
-init _ url key =
+init : Encode.Value -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
+init flags url key =
     let
+        p =
+            case Decode.decodeValue storageDecoder flags of
+                Ok x ->
+                    x
+
+                Err _ ->
+                    []
+
         model =
-            { authToken = "", key = key, username = "", playlists = [], songs = [] }
+            { authToken = "", key = key, username = "", playlists = p, songs = [] }
     in
     case OAuth.parseCode url of
         OAuth.Success { code } ->
@@ -251,13 +264,25 @@ playlistsDecoder : Decode.Decoder (List Playlist)
 playlistsDecoder =
     let
         fields =
-            Decode.map3
-                Playlist
+            Decode.map4
+                (Playlist [])
                 (Decode.field "name" Decode.string)
                 (Decode.field "id" Decode.string)
                 (Decode.at [ "tracks" ] (Decode.field "total" Decode.int))
+                (Decode.field "snapshot_id" Decode.string)
     in
     Decode.at [ "items" ] (Decode.list fields)
+
+
+storageDecoder : Decode.Decoder (List Playlist)
+storageDecoder =
+    Decode.list <|
+        Decode.map4
+            (Playlist [])
+            (Decode.field "name" Decode.string)
+            (Decode.field "id" Decode.string)
+            (Decode.field "length" Decode.int)
+            (Decode.field "snapshot" Decode.string)
 
 
 get : String -> Http.Expect Msg -> String -> Cmd Msg
@@ -331,7 +356,7 @@ view model =
 
 viewPlaylist : Playlist -> Html Msg
 viewPlaylist p =
-    li [] [ button [ onClick (Shuffle p) ] [ text p.name, text (String.fromInt p.length) ] ]
+    li [] [ button [ onClick (Shuffle p) ] [ text p.name ], text "  ", text (String.fromInt p.length), text "  ", text p.snapshot ]
 
 
 
