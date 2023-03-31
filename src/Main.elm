@@ -47,7 +47,7 @@ type Msg
     | Shuffle Playlist
     | Songs (Result Http.Error ( List Song, Maybe String ))
     | ShuffledState (List Song)
-    | AddedToQueue
+    | AddedToQueue Int
 
 
 type alias Playlist =
@@ -169,15 +169,26 @@ update msg model =
             )
 
         ShuffledState songs ->
-            let
-                makeTask song =
-                    postTask ("/me/player/queue?uri=" ++ song.uri) model.authToken
-                        |> Task.andThen (\_ -> Process.sleep 100000000)
-                        |> Task.perform (\_ -> AddedToQueue)
-            in
-            ( { model | songs = songs }
-            , Cmd.batch (List.map makeTask (List.take 100 songs))
-            )
+            update (AddedToQueue 0) { model | songs = songs }
+
+        AddedToQueue count ->
+            case model.songs of
+                x :: xs ->
+                    let
+                        m =
+                            { model | songs = xs ++ [ x ] }
+                    in
+                    if count == List.length model.songs || count == 250 then
+                        ( m, Cmd.none )
+
+                    else
+                        ( m
+                        , postTask ("/me/player/queue?uri=" ++ x.uri) model.authToken
+                            |> Task.perform (\_ -> AddedToQueue (count + 1))
+                        )
+
+                [] ->
+                    ( model, Cmd.none )
 
         fail ->
             let
@@ -269,7 +280,7 @@ post path tok =
         , headers = [ Http.header "Authorization" tok ]
         , url = Url.toString { apiUrl | path = path }
         , body = Http.emptyBody
-        , expect = Http.expectWhatever (\_ -> AddedToQueue)
+        , expect = Http.expectWhatever (\_ -> Noop)
         , timeout = Nothing
         , tracker = Nothing
         }
