@@ -4823,6 +4823,7 @@ function _Time_getZoneName()
 		callback(_Scheduler_succeed(name));
 	});
 }
+var $author$project$Main$NoOp = {$: 'NoOp'};
 var $elm$core$Basics$EQ = {$: 'EQ'};
 var $elm$core$Basics$GT = {$: 'GT'};
 var $elm$core$Basics$LT = {$: 'LT'};
@@ -7374,7 +7375,6 @@ var $author$project$Main$getAuthToken = function (code) {
 			}));
 };
 var $elm$browser$Browser$Navigation$load = _Browser_load;
-var $elm$core$Debug$log = _Debug_log;
 var $truqu$elm_oauth2$Internal$AuthorizationError = F4(
 	function (error, errorDescription, errorUri, state) {
 		return {error: error, errorDescription: errorDescription, errorUri: errorUri, state: state};
@@ -7788,21 +7788,17 @@ var $author$project$Main$storageDecoder = $elm$json$Json$Decode$list(
 		A2($elm$json$Json$Decode$field, 'snapshot', $elm$json$Json$Decode$string)));
 var $author$project$Main$init = F3(
 	function (flags, url, key) {
-		var playlists = A2(
-			$elm$core$Debug$log,
-			'Grabbed',
-			function () {
-				var _v1 = A2($elm$json$Json$Decode$decodeValue, $author$project$Main$storageDecoder, flags);
-				if (_v1.$ === 'Ok') {
-					var x = _v1.a;
-					return x;
-				} else {
-					var e = _v1.a;
-					var _v2 = A2($elm$core$Debug$log, 'error', e);
-					return _List_Nil;
-				}
-			}());
-		var model = {authToken: '', key: key, playlists: playlists, username: ''};
+		var playlists = function () {
+			var _v1 = A2($elm$json$Json$Decode$decodeValue, $author$project$Main$storageDecoder, flags);
+			if (_v1.$ === 'Ok') {
+				var x = _v1.a;
+				return x;
+			} else {
+				var e = _v1.a;
+				return _List_Nil;
+			}
+		}();
+		var model = {authToken: '', key: key, picture: '', playlists: playlists, username: ''};
 		var _v0 = $truqu$elm_oauth2$OAuth$AuthorizationCode$parseCode(url);
 		if (_v0.$ === 'Success') {
 			var code = _v0.a.code;
@@ -7816,18 +7812,8 @@ var $author$project$Main$init = F3(
 					$elm$url$Url$toString($author$project$Main$authUrl)));
 		}
 	});
-var $author$project$Main$NoOp = {$: 'NoOp'};
-var $author$project$Main$onUrlChange = function (_v0) {
-	return $author$project$Main$NoOp;
-};
-var $author$project$Main$onUrlRequest = function (_v0) {
-	return $author$project$Main$NoOp;
-};
 var $elm$core$Platform$Sub$batch = _Platform_batch;
 var $elm$core$Platform$Sub$none = $elm$core$Platform$Sub$batch(_List_Nil);
-var $author$project$Main$subs = function (_v0) {
-	return $elm$core$Platform$Sub$none;
-};
 var $author$project$Main$AddedToQueue = F2(
 	function (a, b) {
 		return {$: 'AddedToQueue', a: a, b: b};
@@ -8175,16 +8161,31 @@ var $author$project$Main$getTracks = F2(
 				$author$project$Main$songsDecoder),
 			token);
 	});
-var $author$project$Main$GotUsername = function (a) {
-	return {$: 'GotUsername', a: a};
+var $author$project$Main$GotUser = function (a) {
+	return {$: 'GotUser', a: a};
 };
-var $author$project$Main$getUsername = A2(
+var $elm$json$Json$Decode$index = _Json_decodeIndex;
+var $author$project$Main$getUser = A2(
 	$author$project$Main$get,
 	'/me',
 	A2(
 		$elm$http$Http$expectJson,
-		$author$project$Main$GotUsername,
-		A2($elm$json$Json$Decode$field, 'id', $elm$json$Json$Decode$string)));
+		$author$project$Main$GotUser,
+		A3(
+			$elm$json$Json$Decode$map2,
+			F2(
+				function (x, y) {
+					return _Utils_Tuple2(x, y);
+				}),
+			A2($elm$json$Json$Decode$field, 'id', $elm$json$Json$Decode$string),
+			A2(
+				$elm$json$Json$Decode$at,
+				_List_fromArray(
+					['images']),
+				A2(
+					$elm$json$Json$Decode$index,
+					0,
+					A2($elm$json$Json$Decode$field, 'url', $elm$json$Json$Decode$string))))));
 var $author$project$Main$keepUnchanged = F2(
 	function (old, _new) {
 		var replace = function (p) {
@@ -8203,6 +8204,7 @@ var $author$project$Main$keepUnchanged = F2(
 		};
 		return A2($elm$core$List$map, replace, _new);
 	});
+var $elm$core$Debug$log = _Debug_log;
 var $elm$core$Basics$neq = _Utils_notEqual;
 var $elm$core$Platform$Cmd$none = $elm$core$Platform$Cmd$batch(_List_Nil);
 var $elm$http$Http$expectBytesResponse = F2(
@@ -8327,19 +8329,21 @@ var $author$project$Main$update = F2(
 										$elm$browser$Browser$Navigation$replaceUrl,
 										model.key,
 										$elm$url$Url$toString($author$project$Main$homeUrl)),
-										$author$project$Main$getUsername(tok),
+										$author$project$Main$getUser(tok),
 										$author$project$Main$getPlaylists(tok)
 									])));
 					} else {
 						break _v0$6;
 					}
-				case 'GotUsername':
+				case 'GotUser':
 					if (msg.a.$ === 'Ok') {
-						var name = msg.a.a;
+						var _v1 = msg.a.a;
+						var name = _v1.a;
+						var image = _v1.b;
 						return _Utils_Tuple2(
 							_Utils_update(
 								model,
-								{username: name}),
+								{picture: image, username: name}),
 							$elm$core$Platform$Cmd$none);
 					} else {
 						break _v0$6;
@@ -8365,9 +8369,9 @@ var $author$project$Main$update = F2(
 				case 'GotSongs':
 					if (msg.b.$ === 'Ok') {
 						var p = msg.a;
-						var _v1 = msg.b.a;
-						var songs = _v1.a;
-						var nextQuery = _v1.b;
+						var _v2 = msg.b.a;
+						var songs = _v2.a;
+						var nextQuery = _v2.b;
 						var newP = _Utils_update(
 							p,
 							{
@@ -8431,7 +8435,7 @@ var $author$project$Main$update = F2(
 								$author$project$Main$post,
 								'/me/player/queue?uri=' + x.uri,
 								model.authToken,
-								function (_v4) {
+								function (_v5) {
 									return A2(
 										$author$project$Main$AddedToQueue,
 										count + 1,
@@ -8447,12 +8451,32 @@ var $author$project$Main$update = F2(
 					break _v0$6;
 			}
 		}
-		var _v5 = A2($elm$core$Debug$log, 'Error', msg);
+		var _v6 = A2($elm$core$Debug$log, 'Error', msg);
 		return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 	});
 var $elm$json$Json$Decode$value = _Json_decodeValue;
 var $elm$html$Html$br = _VirtualDom_node('br');
 var $elm$html$Html$h1 = _VirtualDom_node('h1');
+var $elm$html$Html$Attributes$height = function (n) {
+	return A2(
+		_VirtualDom_attribute,
+		'height',
+		$elm$core$String$fromInt(n));
+};
+var $elm$html$Html$img = _VirtualDom_node('img');
+var $elm$html$Html$Attributes$stringProperty = F2(
+	function (key, string) {
+		return A2(
+			_VirtualDom_property,
+			key,
+			$elm$json$Json$Encode$string(string));
+	});
+var $elm$html$Html$Attributes$src = function (url) {
+	return A2(
+		$elm$html$Html$Attributes$stringProperty,
+		'src',
+		_VirtualDom_noJavaScriptOrHtmlUri(url));
+};
 var $elm$virtual_dom$VirtualDom$text = _VirtualDom_text;
 var $elm$html$Html$text = $elm$virtual_dom$VirtualDom$text;
 var $elm$html$Html$ul = _VirtualDom_node('ul');
@@ -8500,6 +8524,12 @@ var $author$project$Main$viewPlaylist = function (p) {
 				$elm$core$String$fromInt(p.length))
 			]));
 };
+var $elm$html$Html$Attributes$width = function (n) {
+	return A2(
+		_VirtualDom_attribute,
+		'width',
+		$elm$core$String$fromInt(n));
+};
 var $author$project$Main$view = function (model) {
 	return {
 		body: _List_fromArray(
@@ -8512,6 +8542,15 @@ var $author$project$Main$view = function (model) {
 						$elm$html$Html$text('True Shuffle for Spotify')
 					])),
 				$elm$html$Html$text('Welcome, ' + (model.username + '!')),
+				A2(
+				$elm$html$Html$img,
+				_List_fromArray(
+					[
+						$elm$html$Html$Attributes$src(model.picture),
+						$elm$html$Html$Attributes$height(50),
+						$elm$html$Html$Attributes$width(50)
+					]),
+				_List_Nil),
 				A2($elm$html$Html$br, _List_Nil, _List_Nil),
 				A2(
 				$elm$html$Html$ul,
@@ -8522,5 +8561,18 @@ var $author$project$Main$view = function (model) {
 	};
 };
 var $author$project$Main$main = $elm$browser$Browser$application(
-	{init: $author$project$Main$init, onUrlChange: $author$project$Main$onUrlChange, onUrlRequest: $author$project$Main$onUrlRequest, subscriptions: $author$project$Main$subs, update: $author$project$Main$update, view: $author$project$Main$view});
+	{
+		init: $author$project$Main$init,
+		onUrlChange: function (_v0) {
+			return $author$project$Main$NoOp;
+		},
+		onUrlRequest: function (_v1) {
+			return $author$project$Main$NoOp;
+		},
+		subscriptions: function (_v2) {
+			return $elm$core$Platform$Sub$none;
+		},
+		update: $author$project$Main$update,
+		view: $author$project$Main$view
+	});
 _Platform_export({'Main':{'init':$author$project$Main$main($elm$json$Json$Decode$value)(0)}});}(this));

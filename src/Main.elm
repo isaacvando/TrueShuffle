@@ -2,15 +2,14 @@ port module Main exposing (..)
 
 import Browser
 import Browser.Navigation as Nav
-import Dict
 import Html exposing (..)
+import Html.Attributes exposing (height, src, width)
 import Html.Events exposing (onClick)
 import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
 import OAuth
 import OAuth.AuthorizationCode as OAuth
-import Process
 import Random
 import Random.List
 import Task
@@ -24,29 +23,22 @@ main =
         { init = init
         , view = view
         , update = update
-        , subscriptions = subs
-        , onUrlRequest = onUrlRequest
-        , onUrlChange = onUrlChange
+        , subscriptions = \_ -> Sub.none
+        , onUrlRequest = \_ -> NoOp
+        , onUrlChange = \_ -> NoOp
         }
+
+
+port setStorage : Encode.Value -> Cmd a
 
 
 type alias Model =
     { authToken : String
     , key : Nav.Key
     , username : String
+    , picture : String
     , playlists : List Playlist
     }
-
-
-type Msg
-    = GotAccessToken (Result Http.Error OAuth.AuthenticationSuccess)
-    | NoOp
-    | GotUsername (Result Http.Error String)
-    | GotPlaylists (Result Http.Error (List Playlist))
-    | ClickedShuffle Playlist
-    | GotSongs Playlist (Result Http.Error ( List Song, Maybe String ))
-    | ShuffledSongs Playlist
-    | AddedToQueue Int (List Song)
 
 
 type alias Playlist =
@@ -64,7 +56,15 @@ type alias Song =
     }
 
 
-port setStorage : Encode.Value -> Cmd a
+type Msg
+    = GotAccessToken (Result Http.Error OAuth.AuthenticationSuccess)
+    | NoOp
+    | GotUser (Result Http.Error ( String, String ))
+    | GotPlaylists (Result Http.Error (List Playlist))
+    | ClickedShuffle Playlist
+    | GotSongs Playlist (Result Http.Error ( List Song, Maybe String ))
+    | ShuffledSongs Playlist
+    | AddedToQueue Int (List Song)
 
 
 
@@ -99,20 +99,15 @@ init : Encode.Value -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
     let
         playlists =
-            Debug.log "Grabbed" <|
-                case Decode.decodeValue storageDecoder flags of
-                    Ok x ->
-                        x
+            case Decode.decodeValue storageDecoder flags of
+                Ok x ->
+                    x
 
-                    Err e ->
-                        let
-                            _ =
-                                Debug.log "error" e
-                        in
-                        []
+                Err e ->
+                    []
 
         model =
-            { authToken = "", key = key, username = "", playlists = playlists }
+            { authToken = "", key = key, username = "", picture = "", playlists = playlists }
     in
     case OAuth.parseCode url of
         OAuth.Success { code } ->
@@ -151,13 +146,13 @@ update msg model =
             ( { model | authToken = tok }
             , Cmd.batch
                 [ Nav.replaceUrl model.key (Url.toString homeUrl)
-                , getUsername tok
+                , getUser tok
                 , getPlaylists tok
                 ]
             )
 
-        GotUsername (Ok name) ->
-            ( { model | username = name }, Cmd.none )
+        GotUser (Ok ( name, image )) ->
+            ( { model | username = name, picture = image }, Cmd.none )
 
         GotPlaylists (Ok playlists) ->
             ( { model | playlists = keepUnchanged model.playlists playlists }, Cmd.none )
@@ -248,10 +243,6 @@ keepUnchanged old new =
     List.map replace new
 
 
-
--- TODO: Handle playlists with songs whose id is null
-
-
 songsDecoder : Decode.Decoder ( List Song, Maybe String )
 songsDecoder =
     let
@@ -278,9 +269,13 @@ authUrl =
         }
 
 
-getUsername : String -> Cmd Msg
-getUsername =
-    get "/me" (Http.expectJson GotUsername (Decode.field "id" Decode.string))
+getUser : String -> Cmd Msg
+getUser =
+    get "/me" <|
+        Http.expectJson GotUser <|
+            Decode.map2 (\x y -> ( x, y ))
+                (Decode.field "id" Decode.string)
+                (Decode.at [ "images" ] (Decode.index 0 (Decode.field "url" Decode.string)))
 
 
 getPlaylists : String -> Cmd Msg
@@ -402,6 +397,7 @@ view model =
     , body =
         [ h1 [] [ text "True Shuffle for Spotify" ]
         , text <| "Welcome, " ++ model.username ++ "!"
+        , img [ src model.picture, height 50, width 50 ] []
         , br [] []
         , ul [] (List.map viewPlaylist model.playlists)
         ]
@@ -411,29 +407,6 @@ view model =
 viewPlaylist : Playlist -> Html Msg
 viewPlaylist p =
     li [] [ button [ onClick (ClickedShuffle p) ] [ text p.name ], text "  ", text (String.fromInt p.length) ]
-
-
-
--- SUBS
-
-
-subs : Model -> Sub Msg
-subs _ =
-    Sub.none
-
-
-
--- URL
-
-
-onUrlRequest : Browser.UrlRequest -> Msg
-onUrlRequest _ =
-    NoOp
-
-
-onUrlChange : Url.Url -> Msg
-onUrlChange _ =
-    NoOp
 
 
 
