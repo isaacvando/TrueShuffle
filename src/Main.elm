@@ -2,7 +2,10 @@ port module Main exposing (..)
 
 import Browser
 import Browser.Navigation as Nav
-import Html exposing (..)
+import Element exposing (..)
+import Element.Background as Background
+import Element.Font as Font
+import Html
 import Html.Attributes exposing (height, src, width)
 import Html.Events exposing (onClick)
 import Http
@@ -389,24 +392,46 @@ req args =
 
 
 -- VIEW
+-- view : Model -> Browser.Document Msg
+-- view model =
+--     { title = "True Shuffle"
+--     , body =
+--         [ h1 [] [ text "True Shuffle for Spotify" ]
+--         , text <| "Welcome, " ++ model.username ++ "!"
+--         , img [ src model.picture, height 50, width 50 ] []
+--         , br [] []
+--         , ul [] (List.map viewPlaylist model.playlists)
+--         ]
+--     }
+-- viewPlaylist : Playlist -> Html Msg
+-- viewPlaylist p =
+--     li [] [ button [ onClick (ClickedShuffle p) ] [ text p.name ], text "  ", text (String.fromInt p.length) ]
 
 
 view : Model -> Browser.Document Msg
 view model =
     { title = "True Shuffle"
     , body =
-        [ h1 [] [ text "True Shuffle for Spotify" ]
-        , text <| "Welcome, " ++ model.username ++ "!"
-        , img [ src model.picture, height 50, width 50 ] []
-        , br [] []
-        , ul [] (List.map viewPlaylist model.playlists)
+        [ layout
+            [ Background.color (rgb255 25 20 20)
+            , Font.color (rgb 1 1 1)
+            , Font.family
+                [ Font.external
+                    { name = "Roboto"
+                    , url = "https://fonts.googleapis.com/css?family=Roboto"
+                    }
+                , Font.sansSerif
+                ]
+            ]
+            (el
+                [ centerX
+                , Font.color
+                    (rgb255 30 215 96)
+                ]
+                (text "True Shuffle")
+            )
         ]
     }
-
-
-viewPlaylist : Playlist -> Html Msg
-viewPlaylist p =
-    li [] [ button [ onClick (ClickedShuffle p) ] [ text p.name ], text "  ", text (String.fromInt p.length) ]
 
 
 
