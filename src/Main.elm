@@ -98,16 +98,21 @@ clientId =
 init : Encode.Value -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
     let
-        p =
-            case Decode.decodeValue storageDecoder flags of
-                Ok x ->
-                    x
+        playlists =
+            Debug.log "Grabbed" <|
+                case Decode.decodeValue storageDecoder flags of
+                    Ok x ->
+                        x
 
-                Err _ ->
-                    []
+                    Err e ->
+                        let
+                            _ =
+                                Debug.log "error" e
+                        in
+                        []
 
         model =
-            { authToken = "", key = key, username = "", playlists = p }
+            { authToken = "", key = key, username = "", playlists = playlists }
     in
     case OAuth.parseCode url of
         OAuth.Success { code } ->
@@ -158,11 +163,13 @@ update msg model =
             ( { model | playlists = keepUnchanged model.playlists playlists }, Cmd.none )
 
         ClickedShuffle p ->
-            if p.songs == [] then
-                ( model, get ("/playlists/" ++ p.id ++ "/tracks") (Http.expectJson (GotSongs p) songsDecoder) model.authToken )
+            ( model
+            , if p.songs == [] then
+                getTracks p model.authToken
 
-            else
-                update (GotSongs p (Ok ( [], Nothing ))) model
+              else
+                enqueuePlaylist p
+            )
 
         GotSongs p (Ok ( songs, nextQuery )) ->
             let
@@ -176,7 +183,7 @@ update msg model =
             , case nextQuery of
                 Nothing ->
                     Cmd.batch
-                        [ Random.generate (AddedToQueue 0) (Random.List.shuffle newP.songs)
+                        [ enqueuePlaylist newP
                         , setStorage (storageEncoder m.playlists)
                         ]
 
@@ -213,9 +220,14 @@ update msg model =
             ( model, Cmd.none )
 
 
-removePlaylistById : String -> List Playlist -> List Playlist
-removePlaylistById id =
-    List.filter (\p -> p.id /= id)
+enqueuePlaylist : Playlist -> Cmd Msg
+enqueuePlaylist p =
+    Random.generate (AddedToQueue 0) (Random.List.shuffle p.songs)
+
+
+getTracks : Playlist -> String -> Cmd Msg
+getTracks p token =
+    get ("/playlists/" ++ p.id ++ "/tracks") (Http.expectJson (GotSongs p) songsDecoder) token
 
 
 keepUnchanged : List Playlist -> List Playlist -> List Playlist
@@ -295,11 +307,12 @@ storageDecoder =
     Decode.list <|
         Decode.map5
             Playlist
-            (Decode.list <|
-                Decode.map2
-                    Song
-                    (Decode.field "name" Decode.string)
-                    (Decode.field "id" Decode.string)
+            (Decode.field "songs" <|
+                Decode.list <|
+                    Decode.map2
+                        Song
+                        (Decode.field "name" Decode.string)
+                        (Decode.field "uri" Decode.string)
             )
             (Decode.field "name" Decode.string)
             (Decode.field "id" Decode.string)

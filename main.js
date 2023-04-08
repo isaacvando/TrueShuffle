@@ -7374,6 +7374,7 @@ var $author$project$Main$getAuthToken = function (code) {
 			}));
 };
 var $elm$browser$Browser$Navigation$load = _Browser_load;
+var $elm$core$Debug$log = _Debug_log;
 var $truqu$elm_oauth2$Internal$AuthorizationError = F4(
 	function (error, errorDescription, errorUri, state) {
 		return {error: error, errorDescription: errorDescription, errorUri: errorUri, state: state};
@@ -7772,28 +7773,36 @@ var $author$project$Main$storageDecoder = $elm$json$Json$Decode$list(
 	A6(
 		$elm$json$Json$Decode$map5,
 		$author$project$Main$Playlist,
-		$elm$json$Json$Decode$list(
-			A3(
-				$elm$json$Json$Decode$map2,
-				$author$project$Main$Song,
-				A2($elm$json$Json$Decode$field, 'name', $elm$json$Json$Decode$string),
-				A2($elm$json$Json$Decode$field, 'id', $elm$json$Json$Decode$string))),
+		A2(
+			$elm$json$Json$Decode$field,
+			'songs',
+			$elm$json$Json$Decode$list(
+				A3(
+					$elm$json$Json$Decode$map2,
+					$author$project$Main$Song,
+					A2($elm$json$Json$Decode$field, 'name', $elm$json$Json$Decode$string),
+					A2($elm$json$Json$Decode$field, 'uri', $elm$json$Json$Decode$string)))),
 		A2($elm$json$Json$Decode$field, 'name', $elm$json$Json$Decode$string),
 		A2($elm$json$Json$Decode$field, 'id', $elm$json$Json$Decode$string),
 		A2($elm$json$Json$Decode$field, 'length', $elm$json$Json$Decode$int),
 		A2($elm$json$Json$Decode$field, 'snapshot', $elm$json$Json$Decode$string)));
 var $author$project$Main$init = F3(
 	function (flags, url, key) {
-		var p = function () {
-			var _v1 = A2($elm$json$Json$Decode$decodeValue, $author$project$Main$storageDecoder, flags);
-			if (_v1.$ === 'Ok') {
-				var x = _v1.a;
-				return x;
-			} else {
-				return _List_Nil;
-			}
-		}();
-		var model = {authToken: '', key: key, playlists: p, username: ''};
+		var playlists = A2(
+			$elm$core$Debug$log,
+			'Grabbed',
+			function () {
+				var _v1 = A2($elm$json$Json$Decode$decodeValue, $author$project$Main$storageDecoder, flags);
+				if (_v1.$ === 'Ok') {
+					var x = _v1.a;
+					return x;
+				} else {
+					var e = _v1.a;
+					var _v2 = A2($elm$core$Debug$log, 'error', e);
+					return _List_Nil;
+				}
+			}());
+		var model = {authToken: '', key: key, playlists: playlists, username: ''};
 		var _v0 = $truqu$elm_oauth2$OAuth$AuthorizationCode$parseCode(url);
 		if (_v0.$ === 'Success') {
 			var code = _v0.a.code;
@@ -7831,17 +7840,6 @@ var $author$project$Main$apiUrl = _Utils_update(
 	$author$project$Main$defaultHttpsUrl,
 	{host: 'api.spotify.com/v1'});
 var $elm$core$Platform$Cmd$batch = _Platform_batch;
-var $elm$core$List$filter = F2(
-	function (isGood, list) {
-		return A3(
-			$elm$core$List$foldr,
-			F2(
-				function (x, xs) {
-					return isGood(x) ? A2($elm$core$List$cons, x, xs) : xs;
-				}),
-			_List_Nil,
-			list);
-	});
 var $elm$random$Random$Generate = function (a) {
 	return {$: 'Generate', a: a};
 };
@@ -7948,124 +7946,6 @@ var $elm$random$Random$generate = F2(
 			$elm$random$Random$Generate(
 				A2($elm$random$Random$map, tagger, generator)));
 	});
-var $elm$http$Http$emptyBody = _Http_emptyBody;
-var $author$project$Main$get = F3(
-	function (path, expect, tok) {
-		return $elm$http$Http$request(
-			{
-				body: $elm$http$Http$emptyBody,
-				expect: expect,
-				headers: _List_fromArray(
-					[
-						A2($elm$http$Http$header, 'Authorization', tok)
-					]),
-				method: 'GET',
-				timeout: $elm$core$Maybe$Nothing,
-				tracker: $elm$core$Maybe$Nothing,
-				url: $elm$url$Url$toString(
-					_Utils_update(
-						$author$project$Main$apiUrl,
-						{path: path}))
-			});
-	});
-var $author$project$Main$GotPlaylists = function (a) {
-	return {$: 'GotPlaylists', a: a};
-};
-var $elm$json$Json$Decode$at = F2(
-	function (fields, decoder) {
-		return A3($elm$core$List$foldr, $elm$json$Json$Decode$field, decoder, fields);
-	});
-var $author$project$Main$playlistsDecoder = function () {
-	var fields = A5(
-		$elm$json$Json$Decode$map4,
-		$author$project$Main$Playlist(_List_Nil),
-		A2($elm$json$Json$Decode$field, 'name', $elm$json$Json$Decode$string),
-		A2($elm$json$Json$Decode$field, 'id', $elm$json$Json$Decode$string),
-		A2(
-			$elm$json$Json$Decode$at,
-			_List_fromArray(
-				['tracks']),
-			A2($elm$json$Json$Decode$field, 'total', $elm$json$Json$Decode$int)),
-		A2($elm$json$Json$Decode$field, 'snapshot_id', $elm$json$Json$Decode$string));
-	return A2(
-		$elm$json$Json$Decode$at,
-		_List_fromArray(
-			['items']),
-		$elm$json$Json$Decode$list(fields));
-}();
-var $author$project$Main$getPlaylists = A2(
-	$author$project$Main$get,
-	'/me/playlists',
-	A2($elm$http$Http$expectJson, $author$project$Main$GotPlaylists, $author$project$Main$playlistsDecoder));
-var $author$project$Main$GotUsername = function (a) {
-	return {$: 'GotUsername', a: a};
-};
-var $author$project$Main$getUsername = A2(
-	$author$project$Main$get,
-	'/me',
-	A2(
-		$elm$http$Http$expectJson,
-		$author$project$Main$GotUsername,
-		A2($elm$json$Json$Decode$field, 'id', $elm$json$Json$Decode$string)));
-var $author$project$Main$keepUnchanged = F2(
-	function (old, _new) {
-		var replace = function (p) {
-			var _v0 = A2(
-				$elm$core$List$filter,
-				function (x) {
-					return _Utils_eq(x.id, p.id);
-				},
-				old);
-			if (!_v0.b) {
-				return p;
-			} else {
-				var x = _v0.a;
-				return _Utils_eq(x.snapshot, p.snapshot) ? x : p;
-			}
-		};
-		return A2($elm$core$List$map, replace, _new);
-	});
-var $elm$core$Debug$log = _Debug_log;
-var $elm$core$Basics$neq = _Utils_notEqual;
-var $elm$core$Platform$Cmd$none = $elm$core$Platform$Cmd$batch(_List_Nil);
-var $elm$http$Http$expectBytesResponse = F2(
-	function (toMsg, toResult) {
-		return A3(
-			_Http_expect,
-			'arraybuffer',
-			_Http_toDataView,
-			A2($elm$core$Basics$composeR, toResult, toMsg));
-	});
-var $elm$http$Http$expectWhatever = function (toMsg) {
-	return A2(
-		$elm$http$Http$expectBytesResponse,
-		toMsg,
-		$elm$http$Http$resolve(
-			function (_v0) {
-				return $elm$core$Result$Ok(_Utils_Tuple0);
-			}));
-};
-var $author$project$Main$post = F3(
-	function (path, tok, f) {
-		return $elm$http$Http$request(
-			{
-				body: $elm$http$Http$emptyBody,
-				expect: $elm$http$Http$expectWhatever(f),
-				headers: _List_fromArray(
-					[
-						A2($elm$http$Http$header, 'Authorization', tok)
-					]),
-				method: 'POST',
-				timeout: $elm$core$Maybe$Nothing,
-				tracker: $elm$core$Maybe$Nothing,
-				url: $elm$url$Url$toString(
-					_Utils_update(
-						$author$project$Main$apiUrl,
-						{path: path}))
-			});
-	});
-var $elm$browser$Browser$Navigation$replaceUrl = _Browser_replaceUrl;
-var $author$project$Main$setStorage = _Platform_outgoingPort('setStorage', $elm$core$Basics$identity);
 var $elm$core$Basics$negate = function (n) {
 	return -n;
 };
@@ -8180,6 +8060,72 @@ var $elm_community$random_extra$Random$List$shuffle = function (list) {
 		},
 		$elm$random$Random$independentSeed);
 };
+var $author$project$Main$enqueuePlaylist = function (p) {
+	return A2(
+		$elm$random$Random$generate,
+		$author$project$Main$AddedToQueue(0),
+		$elm_community$random_extra$Random$List$shuffle(p.songs));
+};
+var $elm$core$List$filter = F2(
+	function (isGood, list) {
+		return A3(
+			$elm$core$List$foldr,
+			F2(
+				function (x, xs) {
+					return isGood(x) ? A2($elm$core$List$cons, x, xs) : xs;
+				}),
+			_List_Nil,
+			list);
+	});
+var $elm$http$Http$emptyBody = _Http_emptyBody;
+var $author$project$Main$get = F3(
+	function (path, expect, tok) {
+		return $elm$http$Http$request(
+			{
+				body: $elm$http$Http$emptyBody,
+				expect: expect,
+				headers: _List_fromArray(
+					[
+						A2($elm$http$Http$header, 'Authorization', tok)
+					]),
+				method: 'GET',
+				timeout: $elm$core$Maybe$Nothing,
+				tracker: $elm$core$Maybe$Nothing,
+				url: $elm$url$Url$toString(
+					_Utils_update(
+						$author$project$Main$apiUrl,
+						{path: path}))
+			});
+	});
+var $author$project$Main$GotPlaylists = function (a) {
+	return {$: 'GotPlaylists', a: a};
+};
+var $elm$json$Json$Decode$at = F2(
+	function (fields, decoder) {
+		return A3($elm$core$List$foldr, $elm$json$Json$Decode$field, decoder, fields);
+	});
+var $author$project$Main$playlistsDecoder = function () {
+	var fields = A5(
+		$elm$json$Json$Decode$map4,
+		$author$project$Main$Playlist(_List_Nil),
+		A2($elm$json$Json$Decode$field, 'name', $elm$json$Json$Decode$string),
+		A2($elm$json$Json$Decode$field, 'id', $elm$json$Json$Decode$string),
+		A2(
+			$elm$json$Json$Decode$at,
+			_List_fromArray(
+				['tracks']),
+			A2($elm$json$Json$Decode$field, 'total', $elm$json$Json$Decode$int)),
+		A2($elm$json$Json$Decode$field, 'snapshot_id', $elm$json$Json$Decode$string));
+	return A2(
+		$elm$json$Json$Decode$at,
+		_List_fromArray(
+			['items']),
+		$elm$json$Json$Decode$list(fields));
+}();
+var $author$project$Main$getPlaylists = A2(
+	$author$project$Main$get,
+	'/me/playlists',
+	A2($elm$http$Http$expectJson, $author$project$Main$GotPlaylists, $author$project$Main$playlistsDecoder));
 var $elm$json$Json$Decode$null = _Json_decodeNull;
 var $elm$json$Json$Decode$nullable = function (decoder) {
 	return $elm$json$Json$Decode$oneOf(
@@ -8218,6 +8164,85 @@ var $author$project$Main$songsDecoder = function () {
 		songs,
 		nextUrl);
 }();
+var $author$project$Main$getTracks = F2(
+	function (p, token) {
+		return A3(
+			$author$project$Main$get,
+			'/playlists/' + (p.id + '/tracks'),
+			A2(
+				$elm$http$Http$expectJson,
+				$author$project$Main$GotSongs(p),
+				$author$project$Main$songsDecoder),
+			token);
+	});
+var $author$project$Main$GotUsername = function (a) {
+	return {$: 'GotUsername', a: a};
+};
+var $author$project$Main$getUsername = A2(
+	$author$project$Main$get,
+	'/me',
+	A2(
+		$elm$http$Http$expectJson,
+		$author$project$Main$GotUsername,
+		A2($elm$json$Json$Decode$field, 'id', $elm$json$Json$Decode$string)));
+var $author$project$Main$keepUnchanged = F2(
+	function (old, _new) {
+		var replace = function (p) {
+			var _v0 = A2(
+				$elm$core$List$filter,
+				function (x) {
+					return _Utils_eq(x.id, p.id);
+				},
+				old);
+			if (!_v0.b) {
+				return p;
+			} else {
+				var x = _v0.a;
+				return _Utils_eq(x.snapshot, p.snapshot) ? x : p;
+			}
+		};
+		return A2($elm$core$List$map, replace, _new);
+	});
+var $elm$core$Basics$neq = _Utils_notEqual;
+var $elm$core$Platform$Cmd$none = $elm$core$Platform$Cmd$batch(_List_Nil);
+var $elm$http$Http$expectBytesResponse = F2(
+	function (toMsg, toResult) {
+		return A3(
+			_Http_expect,
+			'arraybuffer',
+			_Http_toDataView,
+			A2($elm$core$Basics$composeR, toResult, toMsg));
+	});
+var $elm$http$Http$expectWhatever = function (toMsg) {
+	return A2(
+		$elm$http$Http$expectBytesResponse,
+		toMsg,
+		$elm$http$Http$resolve(
+			function (_v0) {
+				return $elm$core$Result$Ok(_Utils_Tuple0);
+			}));
+};
+var $author$project$Main$post = F3(
+	function (path, tok, f) {
+		return $elm$http$Http$request(
+			{
+				body: $elm$http$Http$emptyBody,
+				expect: $elm$http$Http$expectWhatever(f),
+				headers: _List_fromArray(
+					[
+						A2($elm$http$Http$header, 'Authorization', tok)
+					]),
+				method: 'POST',
+				timeout: $elm$core$Maybe$Nothing,
+				tracker: $elm$core$Maybe$Nothing,
+				url: $elm$url$Url$toString(
+					_Utils_update(
+						$author$project$Main$apiUrl,
+						{path: path}))
+			});
+	});
+var $elm$browser$Browser$Navigation$replaceUrl = _Browser_replaceUrl;
+var $author$project$Main$setStorage = _Platform_outgoingPort('setStorage', $elm$core$Basics$identity);
 var $elm$json$Json$Encode$int = _Json_wrap;
 var $elm$json$Json$Encode$list = F2(
 	function (func, entries) {
@@ -8284,171 +8309,146 @@ var $truqu$elm_oauth2$OAuth$tokenToString = function (_v0) {
 };
 var $author$project$Main$update = F2(
 	function (msg, model) {
-		update:
+		_v0$6:
 		while (true) {
-			_v0$6:
-			while (true) {
-				switch (msg.$) {
-					case 'GotAccessToken':
-						if (msg.a.$ === 'Ok') {
-							var a = msg.a.a;
-							var tok = $truqu$elm_oauth2$OAuth$tokenToString(a.token);
-							return _Utils_Tuple2(
-								_Utils_update(
-									model,
-									{authToken: tok}),
-								$elm$core$Platform$Cmd$batch(
-									_List_fromArray(
-										[
-											A2(
-											$elm$browser$Browser$Navigation$replaceUrl,
-											model.key,
-											$elm$url$Url$toString($author$project$Main$homeUrl)),
-											$author$project$Main$getUsername(tok),
-											$author$project$Main$getPlaylists(tok)
-										])));
-						} else {
-							break _v0$6;
-						}
-					case 'GotUsername':
-						if (msg.a.$ === 'Ok') {
-							var name = msg.a.a;
-							return _Utils_Tuple2(
-								_Utils_update(
-									model,
-									{username: name}),
-								$elm$core$Platform$Cmd$none);
-						} else {
-							break _v0$6;
-						}
-					case 'GotPlaylists':
-						if (msg.a.$ === 'Ok') {
-							var playlists = msg.a.a;
-							return _Utils_Tuple2(
-								_Utils_update(
-									model,
-									{
-										playlists: A2($author$project$Main$keepUnchanged, model.playlists, playlists)
-									}),
-								$elm$core$Platform$Cmd$none);
-						} else {
-							break _v0$6;
-						}
-					case 'ClickedShuffle':
-						var p = msg.a;
-						if (_Utils_eq(p.songs, _List_Nil)) {
-							return _Utils_Tuple2(
+			switch (msg.$) {
+				case 'GotAccessToken':
+					if (msg.a.$ === 'Ok') {
+						var a = msg.a.a;
+						var tok = $truqu$elm_oauth2$OAuth$tokenToString(a.token);
+						return _Utils_Tuple2(
+							_Utils_update(
 								model,
-								A3(
-									$author$project$Main$get,
-									'/playlists/' + (p.id + '/tracks'),
-									A2(
-										$elm$http$Http$expectJson,
-										$author$project$Main$GotSongs(p),
-										$author$project$Main$songsDecoder),
-									model.authToken));
-						} else {
-							var $temp$msg = A2(
-								$author$project$Main$GotSongs,
-								p,
-								$elm$core$Result$Ok(
-									_Utils_Tuple2(_List_Nil, $elm$core$Maybe$Nothing))),
-								$temp$model = model;
-							msg = $temp$msg;
-							model = $temp$model;
-							continue update;
-						}
-					case 'GotSongs':
-						if (msg.b.$ === 'Ok') {
-							var p = msg.a;
-							var _v1 = msg.b.a;
-							var songs = _v1.a;
-							var nextQuery = _v1.b;
-							var newP = _Utils_update(
-								p,
-								{
-									songs: _Utils_ap(p.songs, songs)
-								});
-							var m = _Utils_update(
-								model,
-								{
-									playlists: A2(
-										$elm$core$List$cons,
-										newP,
+								{authToken: tok}),
+							$elm$core$Platform$Cmd$batch(
+								_List_fromArray(
+									[
 										A2(
-											$elm$core$List$filter,
-											function (x) {
-												return !_Utils_eq(newP.id, x.id);
-											},
-											model.playlists))
-								});
-							return _Utils_Tuple2(
-								m,
-								function () {
-									if (nextQuery.$ === 'Nothing') {
-										return $elm$core$Platform$Cmd$batch(
-											_List_fromArray(
-												[
-													A2(
-													$elm$random$Random$generate,
-													$author$project$Main$AddedToQueue(0),
-													$elm_community$random_extra$Random$List$shuffle(newP.songs)),
-													$author$project$Main$setStorage(
-													$author$project$Main$storageEncoder(m.playlists))
-												]));
-									} else {
-										var fullUrl = nextQuery.a;
-										var path = A2(
-											$elm$core$String$dropLeft,
-											$elm$core$String$length(
-												$elm$url$Url$toString($author$project$Main$apiUrl)),
-											fullUrl);
-										return A3(
-											$author$project$Main$get,
-											path,
-											A2(
-												$elm$http$Http$expectJson,
-												$author$project$Main$GotSongs(newP),
-												$author$project$Main$songsDecoder),
-											model.authToken);
-									}
-								}());
-						} else {
-							break _v0$6;
-						}
-					case 'AddedToQueue':
-						var count = msg.a;
-						var songs = msg.b;
-						if (songs.b) {
-							var x = songs.a;
-							var xs = songs.b;
-							return (_Utils_eq(
-								count,
-								$elm$core$List$length(songs)) || (count === 5)) ? _Utils_Tuple2(model, $elm$core$Platform$Cmd$none) : _Utils_Tuple2(
-								model,
-								A3(
-									$author$project$Main$post,
-									'/me/player/queue?uri=' + x.uri,
-									model.authToken,
-									function (_v4) {
-										return A2(
-											$author$project$Main$AddedToQueue,
-											count + 1,
-											_Utils_ap(
-												xs,
-												_List_fromArray(
-													[x])));
-									}));
-						} else {
-							return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
-						}
-					default:
+										$elm$browser$Browser$Navigation$replaceUrl,
+										model.key,
+										$elm$url$Url$toString($author$project$Main$homeUrl)),
+										$author$project$Main$getUsername(tok),
+										$author$project$Main$getPlaylists(tok)
+									])));
+					} else {
 						break _v0$6;
-				}
+					}
+				case 'GotUsername':
+					if (msg.a.$ === 'Ok') {
+						var name = msg.a.a;
+						return _Utils_Tuple2(
+							_Utils_update(
+								model,
+								{username: name}),
+							$elm$core$Platform$Cmd$none);
+					} else {
+						break _v0$6;
+					}
+				case 'GotPlaylists':
+					if (msg.a.$ === 'Ok') {
+						var playlists = msg.a.a;
+						return _Utils_Tuple2(
+							_Utils_update(
+								model,
+								{
+									playlists: A2($author$project$Main$keepUnchanged, model.playlists, playlists)
+								}),
+							$elm$core$Platform$Cmd$none);
+					} else {
+						break _v0$6;
+					}
+				case 'ClickedShuffle':
+					var p = msg.a;
+					return _Utils_Tuple2(
+						model,
+						_Utils_eq(p.songs, _List_Nil) ? A2($author$project$Main$getTracks, p, model.authToken) : $author$project$Main$enqueuePlaylist(p));
+				case 'GotSongs':
+					if (msg.b.$ === 'Ok') {
+						var p = msg.a;
+						var _v1 = msg.b.a;
+						var songs = _v1.a;
+						var nextQuery = _v1.b;
+						var newP = _Utils_update(
+							p,
+							{
+								songs: _Utils_ap(p.songs, songs)
+							});
+						var m = _Utils_update(
+							model,
+							{
+								playlists: A2(
+									$elm$core$List$cons,
+									newP,
+									A2(
+										$elm$core$List$filter,
+										function (x) {
+											return !_Utils_eq(newP.id, x.id);
+										},
+										model.playlists))
+							});
+						return _Utils_Tuple2(
+							m,
+							function () {
+								if (nextQuery.$ === 'Nothing') {
+									return $elm$core$Platform$Cmd$batch(
+										_List_fromArray(
+											[
+												$author$project$Main$enqueuePlaylist(newP),
+												$author$project$Main$setStorage(
+												$author$project$Main$storageEncoder(m.playlists))
+											]));
+								} else {
+									var fullUrl = nextQuery.a;
+									var path = A2(
+										$elm$core$String$dropLeft,
+										$elm$core$String$length(
+											$elm$url$Url$toString($author$project$Main$apiUrl)),
+										fullUrl);
+									return A3(
+										$author$project$Main$get,
+										path,
+										A2(
+											$elm$http$Http$expectJson,
+											$author$project$Main$GotSongs(newP),
+											$author$project$Main$songsDecoder),
+										model.authToken);
+								}
+							}());
+					} else {
+						break _v0$6;
+					}
+				case 'AddedToQueue':
+					var count = msg.a;
+					var songs = msg.b;
+					if (songs.b) {
+						var x = songs.a;
+						var xs = songs.b;
+						return (_Utils_eq(
+							count,
+							$elm$core$List$length(songs)) || (count === 5)) ? _Utils_Tuple2(model, $elm$core$Platform$Cmd$none) : _Utils_Tuple2(
+							model,
+							A3(
+								$author$project$Main$post,
+								'/me/player/queue?uri=' + x.uri,
+								model.authToken,
+								function (_v4) {
+									return A2(
+										$author$project$Main$AddedToQueue,
+										count + 1,
+										_Utils_ap(
+											xs,
+											_List_fromArray(
+												[x])));
+								}));
+					} else {
+						return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
+					}
+				default:
+					break _v0$6;
 			}
-			var _v5 = A2($elm$core$Debug$log, 'Error', msg);
-			return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 		}
+		var _v5 = A2($elm$core$Debug$log, 'Error', msg);
+		return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 	});
 var $elm$json$Json$Decode$value = _Json_decodeValue;
 var $elm$html$Html$br = _VirtualDom_node('br');
