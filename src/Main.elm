@@ -158,25 +158,26 @@ update msg model =
             ( { model | playlists = keepUnchanged model.playlists playlists }, Cmd.none )
 
         ClickedShuffle p ->
-            ( model
-            , if p.songs == [] then
-                get ("/playlists/" ++ p.id ++ "/tracks") (Http.expectJson (GotSongs p) songsDecoder) model.authToken
+            if p.songs == [] then
+                ( model, get ("/playlists/" ++ p.id ++ "/tracks") (Http.expectJson (GotSongs p) songsDecoder) model.authToken )
 
-              else
-                Cmd.none
-            )
+            else
+                update (GotSongs p (Ok ( [], Nothing ))) model
 
         GotSongs p (Ok ( songs, nextQuery )) ->
             let
                 newP =
                     { p | songs = p.songs ++ songs }
+
+                m =
+                    { model | playlists = newP :: List.filter (\x -> newP.id /= x.id) model.playlists }
             in
-            ( model
+            ( m
             , case nextQuery of
                 Nothing ->
                     Cmd.batch
                         [ Random.generate (AddedToQueue 0) (Random.List.shuffle newP.songs)
-                        , setStorage (storageEncoder (keepUnchanged [ newP ] model.playlists)) -- This is not great
+                        , setStorage (storageEncoder m.playlists)
                         ]
 
                 Just fullUrl ->
@@ -190,7 +191,7 @@ update msg model =
         AddedToQueue count songs ->
             case songs of
                 x :: xs ->
-                    if count == List.length songs || count == 100 then
+                    if count == List.length songs || count == 5 then
                         ( model, Cmd.none )
 
                     else
@@ -204,12 +205,17 @@ update msg model =
                 [] ->
                     ( model, Cmd.none )
 
-        fail ->
+        _ ->
             let
                 _ =
-                    Debug.log "fail msg" msg
+                    Debug.log "Error" msg
             in
             ( model, Cmd.none )
+
+
+removePlaylistById : String -> List Playlist -> List Playlist
+removePlaylistById id =
+    List.filter (\p -> p.id /= id)
 
 
 keepUnchanged : List Playlist -> List Playlist -> List Playlist
@@ -228,11 +234,6 @@ keepUnchanged old new =
                         p
     in
     List.map replace new
-
-
-getSongs : Playlist -> String -> Cmd Msg
-getSongs p tok =
-    get ("/playlists/" ++ p.id ++ "/tracks") (Http.expectJson (GotSongs p) songsDecoder) tok
 
 
 
