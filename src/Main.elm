@@ -1,13 +1,16 @@
 port module Main exposing (..)
 
+-- import Html
+-- import Html.Attributes exposing (height, src, width)
+-- import Html.Events exposing (onClick)
+
 import Browser
 import Browser.Navigation as Nav
 import Element exposing (..)
 import Element.Background as Background
+import Element.Border as Border
 import Element.Font as Font
-import Html
-import Html.Attributes exposing (height, src, width)
-import Html.Events exposing (onClick)
+import Element.Input as Input
 import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
@@ -209,6 +212,9 @@ update msg model =
 
                 [] ->
                     ( model, Cmd.none )
+
+        NoOp ->
+            ( model, Cmd.none )
 
         _ ->
             let
@@ -413,8 +419,8 @@ view model =
     { title = "True Shuffle"
     , body =
         [ layout
-            [ Background.color (rgb255 25 20 20)
-            , Font.color (rgb 1 1 1)
+            [ Background.color backgroundColor
+            , Font.color textColor
             , Font.family
                 [ Font.external
                     { name = "Roboto"
@@ -422,16 +428,73 @@ view model =
                     }
                 , Font.sansSerif
                 ]
+            , padding 15
             ]
-            (el
-                [ centerX
-                , Font.color
-                    (rgb255 30 215 96)
+          <|
+            column [ width fill, Font.center ]
+                [ viewHeader model
+                , column [ centerX, spacing 7 ] (List.map viewPlaylist model.playlists)
                 ]
-                (text "True Shuffle")
-            )
         ]
     }
+
+
+accentColor : Color
+accentColor =
+    rgb255 30 215 96
+
+
+backgroundColor : Color
+backgroundColor =
+    rgb255 25 20 20
+
+
+textColor : Color
+textColor =
+    rgb 1 1 1
+
+
+viewPlaylist p =
+    Input.button
+        [ Background.color accentColor
+        , Font.color backgroundColor
+        , width (minimum 200 fill)
+        , Border.rounded 50
+        , height (px 40)
+        , Font.center
+        ]
+        { onPress = Just (ClickedShuffle p)
+        , label = paragraph [ padding 15, moveUp 1.5 ] [ text p.name ]
+        }
+
+
+viewHeader model =
+    row
+        [ centerX
+        , Font.color accentColor
+        , width (maximum 800 fill)
+        , Font.size 30
+        ]
+        [ text "True Shuffle"
+        , row
+            [ alignRight
+            , spacing 10
+            ]
+            [ text model.username
+            , viewPfp model
+            ]
+        ]
+
+
+viewPfp model =
+    image
+        [ centerX
+        , centerY
+        , Border.rounded 100
+        , clip
+        , width (px 50)
+        ]
+        { src = model.picture, description = "User profile picture" }
 
 
 
