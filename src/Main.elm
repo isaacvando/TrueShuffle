@@ -398,20 +398,21 @@ req args =
 
 
 -- VIEW
--- view : Model -> Browser.Document Msg
--- view model =
---     { title = "True Shuffle"
---     , body =
---         [ h1 [] [ text "True Shuffle for Spotify" ]
---         , text <| "Welcome, " ++ model.username ++ "!"
---         , img [ src model.picture, height 50, width 50 ] []
---         , br [] []
---         , ul [] (List.map viewPlaylist model.playlists)
---         ]
---     }
--- viewPlaylist : Playlist -> Html Msg
--- viewPlaylist p =
---     li [] [ button [ onClick (ClickedShuffle p) ] [ text p.name ], text "  ", text (String.fromInt p.length) ]
+
+
+accentColor : Color
+accentColor =
+    rgb255 30 215 96
+
+
+backgroundColor : Color
+backgroundColor =
+    rgb255 25 20 20
+
+
+textColor : Color
+textColor =
+    rgb 1 1 1
 
 
 view : Model -> Browser.Document Msg
@@ -439,21 +440,6 @@ view model =
     }
 
 
-accentColor : Color
-accentColor =
-    rgb255 30 215 96
-
-
-backgroundColor : Color
-backgroundColor =
-    rgb255 25 20 20
-
-
-textColor : Color
-textColor =
-    rgb 1 1 1
-
-
 viewPlaylist p =
     Input.button
         [ Background.color accentColor
@@ -475,7 +461,8 @@ viewHeader model =
         , width (maximum 800 fill)
         , Font.size 30
         ]
-        [ text "True Shuffle"
+        [ image [ width (px 67) ] { src = "../images/icon.png", description = "spotify logo" }
+        , text "True Shuffle"
         , row
             [ alignRight
             , spacing 10
