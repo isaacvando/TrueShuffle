@@ -1,9 +1,5 @@
 port module Main exposing (..)
 
--- import Html
--- import Html.Attributes exposing (height, src, width)
--- import Html.Events exposing (onClick)
-
 import Browser
 import Browser.Navigation as Nav
 import Element exposing (..)
@@ -109,7 +105,7 @@ init flags url key =
                 Ok x ->
                     x
 
-                Err e ->
+                Err _ ->
                     []
 
         model =
