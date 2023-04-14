@@ -235,7 +235,7 @@ update msg model =
         AddedToQueue count songs ->
             case songs of
                 x :: xs ->
-                    if count == List.length songs || count == 5 then
+                    if count == List.length songs || count == 100 then
                         ( model, Cmd.none )
 
                     else
