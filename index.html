@@ -34,7 +34,6 @@
 			const bytes = Array.from(crypto.getRandomValues(buffer));
 			localStorage.setItem("bytes", bytes);
 			app.ports.randomBytes.send(bytes);
-			console.log("made bytes", bytes)
 		});
 	</script>
 </body>

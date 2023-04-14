@@ -2,7 +2,6 @@ port module Main exposing (..)
 
 import Browser
 import Browser.Navigation as Nav
-import Bytes exposing (Bytes)
 import Bytes.Encode as Bytes
 import Element exposing (..)
 import Element.Background as Background
@@ -13,11 +12,9 @@ import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
 import OAuth
-import OAuth.AuthorizationCode as OAuth
 import OAuth.AuthorizationCode.PKCE as PKCE
 import Random
 import Random.List
-import Task
 import Url exposing (Protocol(..), Url)
 import Url.Parser exposing ((<?>))
 
@@ -49,6 +46,7 @@ type alias Model =
     , username : String
     , picture : String
     , playlists : List Playlist
+    , errorState : Maybe Msg
     }
 
 
@@ -68,12 +66,12 @@ type alias Song =
 
 
 type Msg
-    = GotAccessToken (Result Http.Error OAuth.AuthenticationSuccess)
+    = GotAccessToken (Result Http.Error PKCE.AuthenticationSuccess)
     | NoOp
     | Error String
     | GotRandomBytes (List Int)
     | GotUser (Result Http.Error ( String, String ))
-    | GotPlaylists (Result Http.Error (List Playlist))
+    | GotPlaylists (Result Http.Error ( List Playlist, Maybe String ))
     | ClickedShuffle Playlist
     | GotSongs Playlist (Result Http.Error ( List Song, Maybe String ))
     | ShuffledSongs Playlist
@@ -94,11 +92,6 @@ apiUrl =
     { defaultHttpsUrl | host = "api.spotify.com/v1" }
 
 
-clientSecret : String
-clientSecret =
-    "c14d1577b0e647d481170aa6192021f0"
-
-
 clientId : String
 clientId =
     "0cdc0205c0184f809fa13c8f71d7848c"
@@ -114,14 +107,11 @@ init ( randomList, playlists ) url key =
         p =
             Decode.decodeValue storageDecoder playlists |> Result.withDefault []
 
-        foo =
-            Debug.log "randomList" randomList
-
         model =
-            { authToken = "", key = key, username = "", picture = "", playlists = p }
+            { authToken = "", key = key, username = "", picture = "", playlists = p, errorState = Nothing }
     in
-    case OAuth.parseCode url of
-        OAuth.Success { code } ->
+    case PKCE.parseCode url of
+        PKCE.Success { code } ->
             case getCodeVerifier randomList of
                 Just c ->
                     ( model, getAuthToken code c )
@@ -130,15 +120,18 @@ init ( randomList, playlists ) url key =
                     update (Error "After recieving an access code a codeVerifier could not be constructed") model
 
         _ ->
-            -- ( model, getAuthUrl codeVerifier |> Url.toString |> Nav.load )
             ( model, genRandomBytes () )
+
+
+
+-- AUTHENTICATION
 
 
 getAuthUrl : PKCE.CodeVerifier -> Url
 getAuthUrl codeVerifier =
     PKCE.makeAuthorizationUrl
         { clientId = clientId
-        , url = authUrl
+        , url = { defaultHttpsUrl | host = "accounts.spotify.com", path = "/authorize" }
         , redirectUri = homeUrl
         , scope = [ "playlist-read-private", "user-modify-playback-state" ]
         , state = Nothing
@@ -154,22 +147,7 @@ getCodeVerifier x =
         |> PKCE.codeVerifierFromBytes
 
 
-
--- getAuthToken : OAuth.AuthorizationCode -> Cmd Msg
--- getAuthToken code =
---     Http.request <|
---         OAuth.makeTokenRequest GotAccessToken
---             { credentials =
---                 { clientId = clientId
---                 , secret = Just clientSecret
---                 }
---             , code = code
---             , url = { defaultHttpsUrl | host = "accounts.spotify.com", path = "/api/token" }
---             , redirectUri = homeUrl
---             }
-
-
-getAuthToken : OAuth.AuthorizationCode -> PKCE.CodeVerifier -> Cmd Msg
+getAuthToken : PKCE.AuthorizationCode -> PKCE.CodeVerifier -> Cmd Msg
 getAuthToken code verifier =
     Http.request <|
         PKCE.makeTokenRequest GotAccessToken
@@ -208,15 +186,22 @@ update msg model =
             , Cmd.batch
                 [ Nav.replaceUrl model.key (Url.toString homeUrl)
                 , getUser tok
-                , getPlaylists tok
+                , get (getUrlFromPath "/me/playlists") (Http.expectJson GotPlaylists playlistsDecoder) tok
                 ]
             )
 
         GotUser (Ok ( name, image )) ->
             ( { model | username = name, picture = image }, Cmd.none )
 
-        GotPlaylists (Ok playlists) ->
-            ( { model | playlists = keepUnchanged model.playlists playlists }, Cmd.none )
+        GotPlaylists (Ok ( playlists, nextUrl )) ->
+            case nextUrl of
+                Nothing ->
+                    ( { model | playlists = keepUnchanged model.playlists playlists }, Cmd.none )
+
+                Just url ->
+                    ( { model | playlists = model.playlists ++ playlists }
+                    , get url (Http.expectJson GotPlaylists playlistsDecoder) model.authToken
+                    )
 
         ClickedShuffle p ->
             ( model
@@ -243,12 +228,8 @@ update msg model =
                         , setStorage (storageEncoder m.playlists)
                         ]
 
-                Just fullUrl ->
-                    let
-                        path =
-                            String.dropLeft (String.length (Url.toString apiUrl)) fullUrl
-                    in
-                    get path (Http.expectJson (GotSongs newP) songsDecoder) model.authToken
+                Just url ->
+                    get url (Http.expectJson (GotSongs newP) songsDecoder) model.authToken
             )
 
         AddedToQueue count songs ->
@@ -260,7 +241,7 @@ update msg model =
                     else
                         ( model
                         , post
-                            ("/me/player/queue?uri=" ++ x.uri)
+                            (getUrlFromPath ("/me/player/queue?uri=" ++ x.uri))
                             model.authToken
                             (\_ -> AddedToQueue (count + 1) (xs ++ [ x ]))
                         )
@@ -276,7 +257,7 @@ update msg model =
                 _ =
                     Debug.log "Error" msg
             in
-            ( model, Cmd.none )
+            ( { model | errorState = Just msg }, Cmd.none )
 
 
 enqueuePlaylist : Playlist -> Cmd Msg
@@ -286,14 +267,14 @@ enqueuePlaylist p =
 
 getTracks : Playlist -> String -> Cmd Msg
 getTracks p token =
-    get ("/playlists/" ++ p.id ++ "/tracks") (Http.expectJson (GotSongs p) songsDecoder) token
+    get (getUrlFromPath <| "/playlists/" ++ p.id ++ "/tracks") (Http.expectJson (GotSongs p) songsDecoder) token
 
 
 keepUnchanged : List Playlist -> List Playlist -> List Playlist
 keepUnchanged old new =
     let
         replace p =
-            case List.filter (\x -> x.id == p.id) old of
+            case List.filter (\x -> x.id == p.id) new of
                 [] ->
                     p
 
@@ -304,153 +285,16 @@ keepUnchanged old new =
                     else
                         p
     in
-    List.map replace new
-
-
-songsDecoder : Decode.Decoder ( List Song, Maybe String )
-songsDecoder =
-    let
-        fields =
-            Decode.map2 Song (Decode.field "name" Decode.string) (Decode.field "uri" Decode.string)
-
-        songs =
-            Decode.at [ "items" ] (Decode.list (Decode.at [ "track" ] fields))
-
-        nextUrl =
-            Decode.field "next" (Decode.nullable Decode.string)
-    in
-    Decode.map2 (\x y -> ( x, y )) songs nextUrl
-
-
-authUrl : Url.Url
-authUrl =
-    OAuth.makeAuthorizationUrl
-        { clientId = clientId
-        , url = { defaultHttpsUrl | host = "accounts.spotify.com", path = "/authorize" }
-        , redirectUri = homeUrl
-        , scope = [ "playlist-read-private", "user-modify-playback-state" ]
-
-        -- , scope = []
-        , state = Nothing
-        }
+    List.map replace old
 
 
 getUser : String -> Cmd Msg
 getUser =
-    get "/me" <|
+    get (getUrlFromPath "/me") <|
         Http.expectJson GotUser <|
             Decode.map2 (\x y -> ( x, y ))
                 (Decode.field "id" Decode.string)
                 (Decode.at [ "images" ] (Decode.index 0 (Decode.field "url" Decode.string)))
-
-
-getPlaylists : String -> Cmd Msg
-getPlaylists =
-    get "/me/playlists" (Http.expectJson GotPlaylists playlistsDecoder)
-
-
-playlistsDecoder : Decode.Decoder (List Playlist)
-playlistsDecoder =
-    let
-        fields =
-            Decode.map4
-                (Playlist [])
-                (Decode.field "name" Decode.string)
-                (Decode.field "id" Decode.string)
-                (Decode.at [ "tracks" ] (Decode.field "total" Decode.int))
-                (Decode.field "snapshot_id" Decode.string)
-    in
-    Decode.at [ "items" ] (Decode.list fields)
-
-
-storageDecoder : Decode.Decoder (List Playlist)
-storageDecoder =
-    Decode.list <|
-        Decode.map5
-            Playlist
-            (Decode.field "songs" <|
-                Decode.list <|
-                    Decode.map2
-                        Song
-                        (Decode.field "name" Decode.string)
-                        (Decode.field "uri" Decode.string)
-            )
-            (Decode.field "name" Decode.string)
-            (Decode.field "id" Decode.string)
-            (Decode.field "length" Decode.int)
-            (Decode.field "snapshot" Decode.string)
-
-
-storageEncoder : List Playlist -> Encode.Value
-storageEncoder ps =
-    let
-        encodeSong s =
-            Encode.object
-                [ ( "name", Encode.string s.name )
-                , ( "uri", Encode.string s.uri )
-                ]
-
-        item p =
-            Encode.object
-                [ ( "songs", Encode.list encodeSong p.songs )
-                , ( "name", Encode.string p.name )
-                , ( "id", Encode.string p.id )
-                , ( "length", Encode.int p.length )
-                , ( "snapshot", Encode.string p.snapshot )
-                ]
-    in
-    Encode.list item ps
-
-
-get : String -> Http.Expect Msg -> String -> Cmd Msg
-get path expect tok =
-    Http.request
-        { method = "GET"
-        , headers = [ Http.header "Authorization" tok ]
-        , url = Url.toString { apiUrl | path = path }
-        , body = Http.emptyBody
-        , expect = expect
-        , timeout = Nothing
-        , tracker = Nothing
-        }
-
-
-post : String -> String -> (Result Http.Error () -> Msg) -> Cmd Msg
-post path tok f =
-    Http.request
-        { method = "POST"
-        , headers = [ Http.header "Authorization" tok ]
-        , url = Url.toString { apiUrl | path = path }
-        , body = Http.emptyBody
-        , expect = Http.expectWhatever f
-        , timeout = Nothing
-        , tracker = Nothing
-        }
-
-
-postTask : String -> String -> Task.Task Never Msg
-postTask path tok =
-    Http.task
-        { method = "POST"
-        , headers = [ Http.header "Authorization" tok ]
-        , url = Url.toString { apiUrl | path = path }
-        , body = Http.emptyBody
-        , resolver = Http.stringResolver (\_ -> Ok NoOp)
-        , timeout = Nothing
-        }
-
-
-req : { path : String, token : String, method : String, expect : Http.Expect Msg } -> Cmd Msg
-req args =
-    Http.request
-        { method = args.method
-        , headers = [ Http.header "Authorization" args.token ]
-        , url = Url.toString { apiUrl | path = args.path }
-        , body = Http.emptyBody
-        , expect = args.expect
-        , timeout = Nothing
-        , tracker = Nothing
-        }
 
 
 
@@ -488,13 +332,34 @@ view model =
                 ]
             , padding 15
             ]
-          <|
-            column [ width fill, Font.center ]
-                [ viewHeader model
-                , column [ centerX, spacing 7 ] (List.map viewPlaylist model.playlists)
-                ]
+            (case model.errorState of
+                Nothing ->
+                    viewBody model
+
+                Just err ->
+                    case err of
+                        Error msg ->
+                            viewError msg
+
+                        _ ->
+                            viewError "Whoops. Didn't expect that. Your best bet is checking dev tools ->"
+            )
         ]
     }
+
+
+viewBody model =
+    column [ width fill, Font.center ]
+        [ viewHeader model
+        , column [ centerX, spacing 7 ] (List.map viewPlaylist model.playlists)
+        ]
+
+
+viewError msg =
+    column [ width fill, Font.center, Font.color accentColor, spacing 10 ]
+        [ paragraph [ Font.bold, Font.size 50 ] [ text "Ruh roh, error time" ]
+        , paragraph [] [ text msg ]
+        ]
 
 
 viewPlaylist p =
@@ -542,6 +407,89 @@ viewPfp model =
 
 
 
+-- ENCODERS/DECODERS
+
+
+songsDecoder : Decode.Decoder ( List Song, Maybe String )
+songsDecoder =
+    let
+        songs =
+            Decode.at [ "items" ]
+                (Decode.list
+                    (Decode.at [ "track" ] <|
+                        Decode.map2
+                            Song
+                            (Decode.field "name" Decode.string)
+                            (Decode.field "uri" Decode.string)
+                    )
+                )
+
+        nextUrl =
+            Decode.field "next" (Decode.nullable Decode.string)
+    in
+    Decode.map2 (\x y -> ( x, y )) songs nextUrl
+
+
+playlistsDecoder : Decode.Decoder ( List Playlist, Maybe String )
+playlistsDecoder =
+    let
+        playlists =
+            Decode.at [ "items" ]
+                (Decode.list <|
+                    Decode.map4
+                        (Playlist [])
+                        (Decode.field "name" Decode.string)
+                        (Decode.field "id" Decode.string)
+                        (Decode.at [ "tracks" ] (Decode.field "total" Decode.int))
+                        (Decode.field "snapshot_id" Decode.string)
+                )
+
+        nextUrl =
+            Decode.field "next" (Decode.nullable Decode.string)
+    in
+    Decode.map2 (\x y -> ( x, y )) playlists nextUrl
+
+
+storageDecoder : Decode.Decoder (List Playlist)
+storageDecoder =
+    Decode.list <|
+        Decode.map5
+            Playlist
+            (Decode.field "songs" <|
+                Decode.list <|
+                    Decode.map2
+                        Song
+                        (Decode.field "name" Decode.string)
+                        (Decode.field "uri" Decode.string)
+            )
+            (Decode.field "name" Decode.string)
+            (Decode.field "id" Decode.string)
+            (Decode.field "length" Decode.int)
+            (Decode.field "snapshot" Decode.string)
+
+
+storageEncoder : List Playlist -> Encode.Value
+storageEncoder ps =
+    let
+        encodeSong s =
+            Encode.object
+                [ ( "name", Encode.string s.name )
+                , ( "uri", Encode.string s.uri )
+                ]
+
+        item p =
+            Encode.object
+                [ ( "songs", Encode.list encodeSong p.songs )
+                , ( "name", Encode.string p.name )
+                , ( "id", Encode.string p.id )
+                , ( "length", Encode.int p.length )
+                , ( "snapshot", Encode.string p.snapshot )
+                ]
+    in
+    Encode.list item ps
+
+
+
 -- HELPERS
 
 
@@ -554,3 +502,34 @@ defaultHttpsUrl =
     , query = Nothing
     , fragment = Nothing
     }
+
+
+get : String -> Http.Expect Msg -> String -> Cmd Msg
+get url expect tok =
+    Http.request
+        { method = "GET"
+        , headers = [ Http.header "Authorization" tok ]
+        , url = url
+        , body = Http.emptyBody
+        , expect = expect
+        , timeout = Nothing
+        , tracker = Nothing
+        }
+
+
+post : String -> String -> (Result Http.Error () -> Msg) -> Cmd Msg
+post url tok f =
+    Http.request
+        { method = "POST"
+        , headers = [ Http.header "Authorization" tok ]
+        , url = url
+        , body = Http.emptyBody
+        , expect = Http.expectWhatever f
+        , timeout = Nothing
+        , tracker = Nothing
+        }
+
+
+getUrlFromPath : String -> String
+getUrlFromPath path =
+    { apiUrl | path = path } |> Url.toString
