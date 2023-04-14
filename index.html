@@ -9,17 +9,27 @@
 <body>
 	<div id="myapp"></div>
 	<script>
-		let storedData = localStorage.getItem('state');
-		let flags = storedData ? JSON.parse(storedData) : null;
+		const storedData = localStorage.getItem('state');
+		const playlists = storedData ? JSON.parse(storedData) : null;
 
-		let app = Elm.Main.init({
+		const bytes = Array.from(crypto.getRandomValues(new Uint8Array(64)));
+		console.log(bytes)
+
+		const app = Elm.Main.init({
 			node: document.getElementById('myapp'),
-			flags: flags
+			flags: [
+				[68, 115, 46, 195, 173, 29, 56, 171, 52, 229, 23, 45, 36, 211, 207, 103, 132, 251, 119, 147, 195, 82, 178, 113, 64, 20, 242, 85, 123, 82, 21, 21, 77, 152, 97, 28, 83, 1, 181, 6, 225, 245, 113, 48, 15, 133, 59, 126, 14, 139, 12, 3, 251, 31, 25, 131, 98, 21, 55, 82, 152, 251, 13, 162]
+				, playlists
+			]
 		});
 
 		app.ports.setStorage.subscribe((state) => {
 			localStorage.setItem('state', JSON.stringify(state));
 		});
+
+		app.ports.send.randomBytes(() => {
+			localStorage.getItem("bytes")
+		})
 	</script>
 </body>
 

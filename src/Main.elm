@@ -2,6 +2,8 @@ port module Main exposing (..)
 
 import Browser
 import Browser.Navigation as Nav
+import Bytes exposing (Bytes)
+import Bytes.Encode as Bytes
 import Element exposing (..)
 import Element.Background as Background
 import Element.Border as Border
@@ -12,14 +14,15 @@ import Json.Decode as Decode
 import Json.Encode as Encode
 import OAuth
 import OAuth.AuthorizationCode as OAuth
+import OAuth.AuthorizationCode.PKCE as PKCE
 import Random
 import Random.List
 import Task
-import Url exposing (Protocol(..))
+import Url exposing (Protocol(..), Url)
 import Url.Parser exposing ((<?>))
 
 
-main : Program Encode.Value Model Msg
+main : Program ( List Int, Encode.Value ) Model Msg
 main =
     Browser.application
         { init = init
@@ -97,39 +100,68 @@ clientId =
 -- INIT
 
 
-init : Encode.Value -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
-init flags url key =
+init : ( List Int, Encode.Value ) -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
+init ( randomList, playlists ) url key =
     let
-        playlists =
-            case Decode.decodeValue storageDecoder flags of
-                Ok x ->
-                    x
+        p =
+            Decode.decodeValue storageDecoder playlists |> Result.withDefault []
 
-                Err _ ->
-                    []
+        bytes =
+            List.map Bytes.unsignedInt8 randomList |> Bytes.sequence |> Bytes.encode
+
+        codeVerifier =
+            PKCE.codeVerifierFromBytes bytes |> Maybe.withDefault (Debug.todo "ugh")
 
         model =
-            { authToken = "", key = key, username = "", picture = "", playlists = playlists }
+            { authToken = "", key = key, username = "", picture = "", playlists = p }
     in
     case OAuth.parseCode url of
         OAuth.Success { code } ->
-            ( model, getAuthToken code )
+            ( model, getAuthToken code codeVerifier )
 
         _ ->
-            ( model, Nav.load (Url.toString authUrl) )
+            ( model, getAuthUrl codeVerifier |> Url.toString |> Nav.load )
 
 
-getAuthToken : OAuth.AuthorizationCode -> Cmd Msg
-getAuthToken code =
+getAuthUrl : PKCE.CodeVerifier -> Url
+getAuthUrl codeVerifier =
+    PKCE.makeAuthorizationUrl
+        { clientId = clientId
+        , url = authUrl
+        , redirectUri = homeUrl
+        , scope = [ "playlist-read-private", "user-modify-playback-state" ]
+        , state = Nothing
+        , codeChallenge = PKCE.mkCodeChallenge codeVerifier
+        }
+
+
+
+-- getAuthToken : OAuth.AuthorizationCode -> Cmd Msg
+-- getAuthToken code =
+--     Http.request <|
+--         OAuth.makeTokenRequest GotAccessToken
+--             { credentials =
+--                 { clientId = clientId
+--                 , secret = Just clientSecret
+--                 }
+--             , code = code
+--             , url = { defaultHttpsUrl | host = "accounts.spotify.com", path = "/api/token" }
+--             , redirectUri = homeUrl
+--             }
+
+
+getAuthToken : OAuth.AuthorizationCode -> PKCE.CodeVerifier -> Cmd Msg
+getAuthToken code verifier =
     Http.request <|
-        OAuth.makeTokenRequest GotAccessToken
+        PKCE.makeTokenRequest GotAccessToken
             { credentials =
                 { clientId = clientId
-                , secret = Just clientSecret
+                , secret = Nothing
                 }
             , code = code
             , url = { defaultHttpsUrl | host = "accounts.spotify.com", path = "/api/token" }
             , redirectUri = homeUrl
+            , codeVerifier = verifier
             }
 
 
@@ -270,6 +302,8 @@ authUrl =
         , url = { defaultHttpsUrl | host = "accounts.spotify.com", path = "/authorize" }
         , redirectUri = homeUrl
         , scope = [ "playlist-read-private", "user-modify-playback-state" ]
+
+        -- , scope = []
         , state = Nothing
         }
 
