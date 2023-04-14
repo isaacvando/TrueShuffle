@@ -28,13 +28,19 @@ main =
         { init = init
         , view = view
         , update = update
-        , subscriptions = \_ -> Sub.none
+        , subscriptions = \_ -> randomBytes GotRandomBytes
         , onUrlRequest = \_ -> NoOp
         , onUrlChange = \_ -> NoOp
         }
 
 
 port setStorage : Encode.Value -> Cmd a
+
+
+port genRandomBytes : () -> Cmd msg
+
+
+port randomBytes : (List Int -> msg) -> Sub msg
 
 
 type alias Model =
@@ -64,6 +70,8 @@ type alias Song =
 type Msg
     = GotAccessToken (Result Http.Error OAuth.AuthenticationSuccess)
     | NoOp
+    | Error String
+    | GotRandomBytes (List Int)
     | GotUser (Result Http.Error ( String, String ))
     | GotPlaylists (Result Http.Error (List Playlist))
     | ClickedShuffle Playlist
@@ -106,21 +114,24 @@ init ( randomList, playlists ) url key =
         p =
             Decode.decodeValue storageDecoder playlists |> Result.withDefault []
 
-        bytes =
-            List.map Bytes.unsignedInt8 randomList |> Bytes.sequence |> Bytes.encode
-
-        codeVerifier =
-            PKCE.codeVerifierFromBytes bytes |> Maybe.withDefault (Debug.todo "ugh")
+        foo =
+            Debug.log "randomList" randomList
 
         model =
             { authToken = "", key = key, username = "", picture = "", playlists = p }
     in
     case OAuth.parseCode url of
         OAuth.Success { code } ->
-            ( model, getAuthToken code codeVerifier )
+            case getCodeVerifier randomList of
+                Just c ->
+                    ( model, getAuthToken code c )
+
+                Nothing ->
+                    update (Error "After recieving an access code a codeVerifier could not be constructed") model
 
         _ ->
-            ( model, getAuthUrl codeVerifier |> Url.toString |> Nav.load )
+            -- ( model, getAuthUrl codeVerifier |> Url.toString |> Nav.load )
+            ( model, genRandomBytes () )
 
 
 getAuthUrl : PKCE.CodeVerifier -> Url
@@ -133,6 +144,14 @@ getAuthUrl codeVerifier =
         , state = Nothing
         , codeChallenge = PKCE.mkCodeChallenge codeVerifier
         }
+
+
+getCodeVerifier : List Int -> Maybe PKCE.CodeVerifier
+getCodeVerifier x =
+    List.map Bytes.unsignedInt8 x
+        |> Bytes.sequence
+        |> Bytes.encode
+        |> PKCE.codeVerifierFromBytes
 
 
 
@@ -172,6 +191,14 @@ getAuthToken code verifier =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        GotRandomBytes randomList ->
+            case getCodeVerifier randomList of
+                Nothing ->
+                    update (Error "A codeVerifier could not be constructed") model
+
+                Just c ->
+                    ( model, getAuthUrl c |> Url.toString |> Nav.load )
+
         GotAccessToken (Ok a) ->
             let
                 tok =
