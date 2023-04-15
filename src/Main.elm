@@ -257,10 +257,6 @@ update msg model =
             ( model, Cmd.none )
 
         _ ->
-            let
-                _ =
-                    Debug.log "Error" msg
-            in
             ( { model | errorState = Just msg }, Cmd.none )
 
 
