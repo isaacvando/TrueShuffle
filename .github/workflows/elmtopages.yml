@@ -21,7 +21,17 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
+
+  build-js:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build Elm artifact
+          uses: jorelali/setup-elm@v5
+          with:
+            elm-version: 0.19.1
+      - run: elm make src/Main.elm --output=main.js --optimize
+
+  deploy:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
