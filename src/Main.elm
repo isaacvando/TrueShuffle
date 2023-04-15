@@ -84,7 +84,7 @@ type Msg
 
 homeUrl : Url.Url
 homeUrl =
-    { defaultHttpsUrl | host = "https://isaacvando.github.io/TrueShuffle/" }
+    { defaultHttpsUrl | host = "isaacvando.github.io", path = "/TrueShuffle" }
 
 
 
