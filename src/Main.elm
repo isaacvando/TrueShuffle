@@ -84,7 +84,11 @@ type Msg
 
 homeUrl : Url.Url
 homeUrl =
-    { defaultHttpsUrl | protocol = Http, host = "127.0.0.1:5500/index.html" }
+    { defaultHttpsUrl | host = "https://isaacvando.github.io/TrueShuffle/" }
+
+
+
+-- { defaultHttpsUrl | protocol = Http, host = "127.0.0.1:5500/index.html" }
 
 
 apiUrl : Url.Url
