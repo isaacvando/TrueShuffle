@@ -26,9 +26,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Build Elm artifact
-          uses: jorelali/setup-elm@v5
-          with:
-            elm-version: 0.19.1
+        uses: jorelali/setup-elm@v5
+        with:
+          elm-version: 0.19.1
       - run: elm make src/Main.elm --output=main.js --optimize
 
   deploy:
