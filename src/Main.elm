@@ -387,7 +387,7 @@ viewHeader model =
         , width (maximum 800 fill)
         , Font.size 30
         ]
-        [ image [ width (px 67) ] { src = "../images/icon.png", description = "spotify logo" }
+        [ image [ width (px 67) ] { src = "./icon.png", description = "spotify logo" }
         , text "True Shuffle"
         , row
             [ alignRight
