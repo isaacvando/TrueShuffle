@@ -65,7 +65,8 @@ jobs:
           if test -f "index.html"; then
             echo "isJs=true" >> $GITHUB_OUTPUT
           else
-            echo "isJs=false" >> $GITHUB_OUTPUT        
+            echo "isJs=false" >> $GITHUB_OUTPUT
+          fi   
       - name: Build Elm artifact
         if: ${{ steps.GITHUB_OUTPUT.isJs }}
         uses: jorelali/setup-elm@v5
