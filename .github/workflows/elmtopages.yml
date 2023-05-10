@@ -75,17 +75,23 @@ jobs:
 
       ### Either Build JS
         # uncomment the --optimize flag if your code does not use Debug\
-      - name: Build JS Elm Artifact
-        if: ${{ steps.check_build_type.outputs.files_exists }}
-        run: elm make src/Main.elm --output=main.js # --optimize
-      - name: Install uglify.js
-        if: ${{ steps.check_build_type.outputs.files_exists }}
-        run: npm install uglify-js -g
-      - name: Uglify main.js
-        if: ${{ steps.check_build_type.outputs.files_exists }}
-        run: uglifyjs main.js --compress "pure_funcs=[F2,F3,F4,F5,F6,F7,F8,F9,A2,A3,A4,A5,A6,A7,A8,A9],pure_getters,keep_fargs=false,unsafe_comps,unsafe" | uglifyjs --mangle --output main.js
+      # - name: Build JS Elm Artifact
+      #   if: ${{ steps.check_build_type.outputs.files_exists }}
+      #   run: elm make src/Main.elm --output=main.js # --optimize
+      # - name: Install uglify.js
+      #   if: ${{ steps.check_build_type.outputs.files_exists }}
+      #   run: npm install uglify-js -g
+      # - name: Uglify main.js
+      #   if: ${{ steps.check_build_type.outputs.files_exists }}
+      #   run: uglifyjs main.js --compress "pure_funcs=[F2,F3,F4,F5,F6,F7,F8,F9,A2,A3,A4,A5,A6,A7,A8,A9],pure_getters,keep_fargs=false,unsafe_comps,unsafe" | uglifyjs --mangle --output main.js
+
+      - name: go crazy
+        run: |
+          elm make src/Main.elm --output=main.js
+          && npm install uglify-js -g
+          && uglifyjs main.js --compress "pure_funcs=[F2,F3,F4,F5,F6,F7,F8,F9,A2,A3,A4,A5,A6,A7,A8,A9],pure_getters,keep_fargs=false,unsafe_comps,unsafe" | uglifyjs --mangle --output main.js
       
-        
+
 
       ### Or Build HTML
       - name: Build HTML Elm Artifact
