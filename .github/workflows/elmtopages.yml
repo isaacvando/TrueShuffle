@@ -62,13 +62,13 @@ jobs:
 
       - name: Check build type
         run: |
-          if test -f "index.html"; then
-            echo "isJs=true" >> $GITHUB_OUTPUT
+          if test -f index.html; then
+            echo true >> $GITHUB_OUTPUT
           else
-            echo "isJs=false" >> $GITHUB_OUTPUT
+            echo false >> $GITHUB_OUTPUT
           fi   
       - name: Build Elm artifact
-        if: ${{ steps.GITHUB_OUTPUT.isJs }}
+        if: ${{ steps.GITHUB_OUTPUT }}
         uses: jorelali/setup-elm@v5
         with:
           elm-version: 0.19.1
