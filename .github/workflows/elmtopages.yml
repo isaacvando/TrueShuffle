@@ -66,13 +66,18 @@ jobs:
         with:
           files: "index.html"
 
-      - name: Build JS Elm Artifact
-        if: ${{ steps.check_build_type.outputs.files_exists }}
+      - name: Instal elm command
         uses: jorelali/setup-elm@v5
         with:
           elm-version: 0.19.1
-      - run: elm make src/Main.elm --output=main.js --optimize
 
+
+
+      ### Either Build JS
+        # uncomment the --optimize flag if your code does not use Debug\
+      - name: Build JS Elm Artifact
+        if: ${{ steps.check_build_type.outputs.files_exists }}
+        run: elm make src/Main.elm --output=main.js # --optimize
       - name: Install uglify.js
         if: ${{ steps.check_build_type.outputs.files_exists }}
         run: npm install uglify-js -g
@@ -80,6 +85,14 @@ jobs:
         if: ${{ steps.check_build_type.outputs.files_exists }}
         run: uglifyjs main.js --compress "pure_funcs=[F2,F3,F4,F5,F6,F7,F8,F9,A2,A3,A4,A5,A6,A7,A8,A9],pure_getters,keep_fargs=false,unsafe_comps,unsafe" | uglifyjs --mangle --output main.js
       
+        
+
+      ### Or Build HTML
+      - name: Build HTML Elm Artifact
+        if: ${{ !steps.check_build_type.outputs.files_exists }}
+        run: elm make src/Main.elm
+
+
 
       - name: Setup Pages
         uses: actions/configure-pages@v3
