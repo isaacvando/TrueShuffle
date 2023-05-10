@@ -44,7 +44,7 @@ jobs:
       ### Either Build JS
       ### use the --optimize flag with the elm make command if your code does not use Debug
       - name: Build JS Elm artifact
-        if: ${{ steps.check_build_type.outputs.files_exists }}
+        if: steps.check_build_type.outputs.files_exists == 'true'
         run: |
           elm make src/Main.elm --output=main.js \
           && npm install uglify-js -g \
@@ -52,7 +52,7 @@ jobs:
 
       ### Or Build HTML
       - name: Build HTML Elm artifact
-        if: ${{ !steps.check_build_type.outputs.files_exists }}
+        if: steps.check_build_type.outputs.files_exists == 'false'
         run: elm make src/Main.elm
 
       - name: Setup Pages
