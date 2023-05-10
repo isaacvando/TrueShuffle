@@ -18,13 +18,13 @@ permissions:
 # Cancel current deployment when a new push occurs
 concurrency:
   group: "pages"
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
 
   build-js:
     runs-on: ubuntu-latest
-    if: fileExists('index.html')
+    # if: fileExists('index.html')
     steps:
       - name: Checkout
         uses: actions/checkout@v3
